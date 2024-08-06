@@ -14,6 +14,7 @@ import org.amnezia.awg.crypto.KeyPair;
 import org.amnezia.awg.util.NonNullForAll;
 
 import java.net.InetAddress;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -51,6 +52,10 @@ public final class Interface {
     private final Optional<Integer> junkPacketMaxSize;
     private final Optional<Integer> initPacketJunkSize;
     private final Optional<Integer> responsePacketJunkSize;
+    private final List<String> preUp;
+    private final List<String> postUp;
+    private final List<String> preDown;
+    private final List<String> postDown;
     private final Optional<Integer> cookieReplyPacketJunkSize;
     private final Optional<Integer> transportPacketJunkSize;
     private final Optional<String> initPacketMagicHeader;
@@ -84,6 +89,10 @@ public final class Interface {
         responsePacketMagicHeader = builder.responsePacketMagicHeader;
         underloadPacketMagicHeader = builder.underloadPacketMagicHeader;
         transportPacketMagicHeader = builder.transportPacketMagicHeader;
+        preUp = Collections.unmodifiableList(new ArrayList<>(builder.preUp));
+        postUp = Collections.unmodifiableList(new ArrayList<>(builder.postUp));
+        preDown = Collections.unmodifiableList(new ArrayList<>(builder.preDown));
+        postDown = Collections.unmodifiableList(new ArrayList<>(builder.postDown));
         specialJunkI1 = builder.specialJunkI1;
         specialJunkI2 = builder.specialJunkI2;
         specialJunkI3 = builder.specialJunkI3;
@@ -160,6 +169,18 @@ public final class Interface {
                 case "h4":
                     builder.parseTransportPacketMagicHeader(attribute.getValue());
                     break;
+                case "preup":
+                    builder.parsePreUp(attribute.getValue());
+                    break;
+                case "postup":
+                    builder.parsePostUp(attribute.getValue());
+                    break;
+                case "predown":
+                    builder.parsePreDown(attribute.getValue());
+                    break;
+                case "postdown":
+                    builder.parsePostDown(attribute.getValue());
+                    break;
                 case "i1":
                     builder.parseSpecialJunkI1(attribute.getValue());
                     break;
@@ -207,6 +228,10 @@ public final class Interface {
                 && responsePacketMagicHeader.equals(other.responsePacketMagicHeader)
                 && underloadPacketMagicHeader.equals(other.underloadPacketMagicHeader)
                 && transportPacketMagicHeader.equals(other.transportPacketMagicHeader)
+                && preUp.equals(other.preUp)
+                && postUp.equals(other.postUp)
+                && preDown.equals(other.preDown)
+                && postDown.equals(other.postDown)
                 && specialJunkI1.equals(other.specialJunkI1)
                 && specialJunkI2.equals(other.specialJunkI2)
                 && specialJunkI3.equals(other.specialJunkI3)
@@ -390,6 +415,22 @@ public final class Interface {
         return transportPacketMagicHeader;
     }
 
+    public List<String> getPreUp() {
+        return preUp;
+    }
+
+    public List<String> getPostUp() {
+        return postUp;
+    }
+
+    public List<String> getPreDown() {
+        return preDown;
+    }
+
+    public List<String> getPostDown() {
+        return postDown;
+    }
+
     /**
      * Returns the specialJunkI1 used for the AmneziaWG interface.
      *
@@ -457,6 +498,10 @@ public final class Interface {
         hash = 31 * hash + responsePacketMagicHeader.hashCode();
         hash = 31 * hash + underloadPacketMagicHeader.hashCode();
         hash = 31 * hash + transportPacketMagicHeader.hashCode();
+        hash = 31 * hash + preUp.hashCode();
+        hash = 31 * hash + postUp.hashCode();
+        hash = 31 * hash + preDown.hashCode();
+        hash = 31 * hash + postDown.hashCode();
         hash = 31 * hash + specialJunkI1.hashCode();
         hash = 31 * hash + specialJunkI2.hashCode();
         hash = 31 * hash + specialJunkI3.hashCode();
@@ -518,6 +563,14 @@ public final class Interface {
         specialJunkI4.ifPresent(i4 -> sb.append("I4 = ").append(i4).append('\n'));
         specialJunkI5.ifPresent(i5 -> sb.append("I5 = ").append(i5).append('\n'));
         sb.append("PrivateKey = ").append(keyPair.getPrivateKey().toBase64()).append('\n');
+        for (final String script : preUp)
+            sb.append("PreUp = ").append(script).append('\n');
+        for (final String script : postUp)
+            sb.append("PostUp = ").append(script).append('\n');
+        for (final String script : preDown)
+            sb.append("PreDown = ").append(script).append('\n');
+        for (final String script : postDown)
+            sb.append("PostDown = ").append(script).append('\n');
         return sb.toString();
     }
 
@@ -585,6 +638,13 @@ public final class Interface {
         // Defaults to not present.
         private Optional<String> initPacketMagicHeader = Optional.empty();
         // Defaults to not present.
+        private List<String> preUp = new ArrayList<>();
+        // Defaults to empty list
+        private List<String> postUp = new ArrayList<>();
+        // Defaults to empty list
+        private List<String> preDown = new ArrayList<>();
+        // Defaults to empty list
+        private List<String> postDown = new ArrayList<>();
         private Optional<String> responsePacketMagicHeader = Optional.empty();
         // Defaults to not present.
         private Optional<String> underloadPacketMagicHeader = Optional.empty();
@@ -857,6 +917,27 @@ public final class Interface {
                 throw new BadConfigException(Section.INTERFACE, Location.PRIVATE_KEY, e);
             }
         }
+
+        public Builder parsePreUp(final String script) {
+            preUp.add(script);
+            return this;
+        }
+
+        public Builder parsePostUp(final String script) {
+            postUp.add(script);
+            return this;
+        }
+
+        public Builder parsePreDown(final String script) {
+            preDown.add(script);
+            return this;
+        }
+
+        public Builder parsePostDown(final String script) {
+            postDown.add(script);
+            return this;
+        }
+
 
         public Builder setKeyPair(final KeyPair keyPair) {
             this.keyPair = keyPair;
