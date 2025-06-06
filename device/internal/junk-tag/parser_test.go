@@ -29,7 +29,7 @@ func TestParse(t *testing.T) {
 		{
 			name:    "extra <",
 			args:    args{input: "<<b 0xf6ab3267fa><c>"},
-			wantErr: fmt.Errorf("ill formated input"),
+			wantErr: fmt.Errorf("empty tag in input"),
 		},
 		{
 			name:    "empty <>",
@@ -51,10 +51,11 @@ func TestParse(t *testing.T) {
 			_, err := Parse(tt.args.input)
 
 			// TODO:  ErrorAs doesn't work as you think
-			// if tt.wantErr != nil {
-			require.ErrorAs(t, err, &tt.wantErr)
-			// 	return
-			// }
+			if tt.wantErr != nil {
+				require.ErrorAs(t, err, &tt.wantErr)
+				return
+			}
+			require.Nil(t, err)
 		})
 	}
 }
