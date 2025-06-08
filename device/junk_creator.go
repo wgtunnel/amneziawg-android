@@ -22,47 +22,48 @@ func NewJunkCreator(d *Device) (junkCreator, error) {
 }
 
 // Should be called with aSecMux RLocked
-func (jc *junkCreator) createJunkPackets() ([][]byte, error) {
-	if jc.device.aSecCfg.junkPacketCount == 0 {
-		return nil, nil
+func (jc *junkCreator) createJunkPackets(junks *[][]byte) error {
+	if jc.device.awg.aSecCfg.junkPacketCount == 0 {
+		return nil
 	}
 
-	junks := make([][]byte, 0, jc.device.aSecCfg.junkPacketCount)
-	for i := 0; i < jc.device.aSecCfg.junkPacketCount; i++ {
+	*junks = make([][]byte, len(*junks)+jc.device.awg.aSecCfg.junkPacketCount)
+	for i := range jc.device.awg.aSecCfg.junkPacketCount {
 		packetSize := jc.randomPacketSize()
 		junk, err := jc.randomJunkWithSize(packetSize)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to create junk packet: %v", err)
+			return fmt.Errorf("create junk packet: %v", err)
 		}
-		junks = append(junks, junk)
+		(*junks)[i] = junk
 	}
-	return junks, nil
+	return nil
 }
 
 // Should be called with aSecMux RLocked
 func (jc *junkCreator) randomPacketSize() int {
 	return int(
 		jc.cha8Rand.Uint64()%uint64(
-			jc.device.aSecCfg.junkPacketMaxSize-jc.device.aSecCfg.junkPacketMinSize,
+			jc.device.awg.aSecCfg.junkPacketMaxSize-jc.device.awg.aSecCfg.junkPacketMinSize,
 		),
-	) + jc.device.aSecCfg.junkPacketMinSize
+	) + jc.device.awg.aSecCfg.junkPacketMinSize
 }
 
 // Should be called with aSecMux RLocked
 func (jc *junkCreator) appendJunk(writer *bytes.Buffer, size int) error {
 	headerJunk, err := jc.randomJunkWithSize(size)
 	if err != nil {
-		return fmt.Errorf("failed to create header junk: %v", err)
+		return fmt.Errorf("create header junk: %v", err)
 	}
 	_, err = writer.Write(headerJunk)
 	if err != nil {
-		return fmt.Errorf("failed to write header junk: %v", err)
+		return fmt.Errorf("write header junk: %v", err)
 	}
 	return nil
 }
 
 // Should be called with aSecMux RLocked
 func (jc *junkCreator) randomJunkWithSize(size int) ([]byte, error) {
+	// TODO: use a memory pool to allocate
 	junk := make([]byte, size)
 	_, err := jc.cha8Rand.Read(junk)
 	return junk, err

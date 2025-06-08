@@ -274,6 +274,7 @@ func TestTwoDevicePing(t *testing.T) {
 	})
 }
 
+// Run test with -race=false to avoid the race for setting the default msgTypes 2 times
 func TestASecurityTwoDevicePing(t *testing.T) {
 	goroutineLeakCheck(t)
 	pair := genTestPair(t, true, true)

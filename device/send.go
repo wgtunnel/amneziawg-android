@@ -126,10 +126,21 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	var sendBuffer [][]byte
 	// so only packet processed for cookie generation
 	var junkedHeader []byte
-	if peer.device.isAdvancedSecurityOn() {
-		peer.device.aSecMux.RLock()
-		junks, err := peer.device.junkCreator.createJunkPackets()
-		peer.device.aSecMux.RUnlock()
+
+	if peer.device.version >= VersionAwg {
+		junks := [][]byte{}
+		if peer.device.version == VersionAwgSpecialHandshake {
+			peer.device.awg.aSecMux.RLock()
+			// set junks depending on packet type
+			junks = peer.device.awg.handshakeHandler.GenerateSpecialJunk()
+			if junks == nil {
+				junks = peer.device.awg.handshakeHandler.GenerateSpecialJunk()
+			}
+			peer.device.awg.aSecMux.RUnlock()
+		}
+		peer.device.awg.aSecMux.RLock()
+		err := peer.device.awg.junkCreator.createJunkPackets(&junks)
+		peer.device.awg.aSecMux.RUnlock()
 
 		if err != nil {
 			peer.device.log.Errorf("%v - %v", peer, err)
@@ -145,19 +156,19 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 			}
 		}
 
-		peer.device.aSecMux.RLock()
-		if peer.device.aSecCfg.initPacketJunkSize != 0 {
-			buf := make([]byte, 0, peer.device.aSecCfg.initPacketJunkSize)
+		peer.device.awg.aSecMux.RLock()
+		if peer.device.awg.aSecCfg.initPacketJunkSize != 0 {
+			buf := make([]byte, 0, peer.device.awg.aSecCfg.initPacketJunkSize)
 			writer := bytes.NewBuffer(buf[:0])
-			err = peer.device.junkCreator.appendJunk(writer, peer.device.aSecCfg.initPacketJunkSize)
+			err = peer.device.awg.junkCreator.appendJunk(writer, peer.device.awg.aSecCfg.initPacketJunkSize)
 			if err != nil {
 				peer.device.log.Errorf("%v - %v", peer, err)
-				peer.device.aSecMux.RUnlock()
+				peer.device.awg.aSecMux.RUnlock()
 				return err
 			}
 			junkedHeader = writer.Bytes()
 		}
-		peer.device.aSecMux.RUnlock()
+		peer.device.awg.aSecMux.RUnlock()
 	}
 
 	var buf [MessageInitiationSize]byte
@@ -195,19 +206,19 @@ func (peer *Peer) SendHandshakeResponse() error {
 	}
 	var junkedHeader []byte
 	if peer.device.isAdvancedSecurityOn() {
-		peer.device.aSecMux.RLock()
-		if peer.device.aSecCfg.responsePacketJunkSize != 0 {
-			buf := make([]byte, 0, peer.device.aSecCfg.responsePacketJunkSize)
+		peer.device.awg.aSecMux.RLock()
+		if peer.device.awg.aSecCfg.responsePacketJunkSize != 0 {
+			buf := make([]byte, 0, peer.device.awg.aSecCfg.responsePacketJunkSize)
 			writer := bytes.NewBuffer(buf[:0])
-			err = peer.device.junkCreator.appendJunk(writer, peer.device.aSecCfg.responsePacketJunkSize)
+			err = peer.device.awg.junkCreator.appendJunk(writer, peer.device.awg.aSecCfg.responsePacketJunkSize)
 			if err != nil {
-				peer.device.aSecMux.RUnlock()
+				peer.device.awg.aSecMux.RUnlock()
 				peer.device.log.Errorf("%v - %v", peer, err)
 				return err
 			}
 			junkedHeader = writer.Bytes()
 		}
-		peer.device.aSecMux.RUnlock()
+		peer.device.awg.aSecMux.RUnlock()
 	}
 	var buf [MessageResponseSize]byte
 	writer := bytes.NewBuffer(buf[:0])

@@ -137,6 +137,7 @@ func (peer *Peer) SendBuffers(buffers [][]byte) error {
 	if err == nil {
 		var totalLen uint64
 		for _, b := range buffers {
+			peer.device.awg.foo.PacketCounter++
 			totalLen += uint64(len(b))
 		}
 		peer.txBytes.Add(totalLen)

@@ -66,7 +66,7 @@ func Test_newBytesGenerator(t *testing.T) {
 			require.Nil(t, err)
 			require.NotNil(t, got)
 
-			gotValues, _ := got.Generate()
+			gotValues := got.Generate()
 			require.Equal(t, tt.want, gotValues)
 		})
 	}
@@ -96,6 +96,13 @@ func Test_newRandomPacketGenerator(t *testing.T) {
 			wantErr: fmt.Errorf("parse int"),
 		},
 		{
+			name: "too large",
+			args: args{
+				param: "1001",
+			},
+			wantErr: fmt.Errorf("random packet size must be less than 1000"),
+		},
+		{
 			name: "valid",
 			args: args{
 				param: "12",
@@ -113,11 +120,9 @@ func Test_newRandomPacketGenerator(t *testing.T) {
 
 			require.Nil(t, err)
 			require.NotNil(t, got)
-			first, err := got.Generate()
-			require.Nil(t, err)
+			first := got.Generate()
 
-			second, err := got.Generate()
-			require.Nil(t, err)
+			second := got.Generate()
 			require.NotEqual(t, first, second)
 		})
 	}

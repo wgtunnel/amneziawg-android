@@ -129,7 +129,7 @@ func (device *Device) RoutineReceiveIncoming(
 		}
 		deathSpiral = 0
 
-		device.aSecMux.RLock()
+		device.awg.aSecMux.RLock()
 		// handle each packet in the batch
 		for i, size := range sizes[:count] {
 			if size < MinMessageSize {
@@ -149,13 +149,14 @@ func (device *Device) RoutineReceiveIncoming(
 					if msgType == assumedMsgType {
 						packet = packet[junkSize:]
 					} else {
-						device.log.Verbosef("Transport packet lined up with another msg type")
+						device.log.Verbosef("transport packet lined up with another msg type")
 						msgType = binary.LittleEndian.Uint32(packet[:4])
 					}
 				} else {
 					msgType = binary.LittleEndian.Uint32(packet[:4])
 					if msgType != MessageTransportType {
-						device.log.Verbosef("ASec: Received message with unknown type")
+						// probably a junk packet
+						device.log.Verbosef("aSec: Received message with unknown type: %d", msgType)
 						continue
 					}
 				}
@@ -245,7 +246,7 @@ func (device *Device) RoutineReceiveIncoming(
 			default:
 			}
 		}
-		device.aSecMux.RUnlock()
+		device.awg.aSecMux.RUnlock()
 		for peer, elemsContainer := range elemsByPeer {
 			if peer.isRunning.Load() {
 				peer.queue.inbound.c <- elemsContainer
@@ -304,7 +305,7 @@ func (device *Device) RoutineHandshake(id int) {
 
 	for elem := range device.queue.handshake.c {
 
-		device.aSecMux.RLock()
+		device.awg.aSecMux.RLock()
 
 		// handle cookie fields and ratelimiting
 
@@ -456,7 +457,7 @@ func (device *Device) RoutineHandshake(id int) {
 			peer.SendKeepalive()
 		}
 	skip:
-		device.aSecMux.RUnlock()
+		device.awg.aSecMux.RUnlock()
 		device.PutMessageBuffer(elem.buffer)
 	}
 }

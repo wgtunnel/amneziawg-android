@@ -42,6 +42,16 @@ func TestParse(t *testing.T) {
 			wantErr: fmt.Errorf("invalid tag"),
 		},
 		{
+			name:    "counter uniqueness violation",
+			args:    args{input: "<c><c>"},
+			wantErr: fmt.Errorf("parse tag needs to be unique"),
+		},
+		{
+			name:    "timestamp uniqueness violation",
+			args:    args{input: "<t><t>"},
+			wantErr: fmt.Errorf("parse tag needs to be unique"),
+		},
+		{
 			name: "valid",
 			args: args{input: "<b 0xf6ab3267fa><c><b 0xf6ab><t><r 10><wt 10>"},
 		},

@@ -2,36 +2,39 @@ package junktag
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"strings"
 )
 
-type Enum string
+type EnumTag string
 
 const (
-	EnumBytes        Enum = "b"
-	EnumCounter      Enum = "c"
-	EnumTimestamp    Enum = "t"
-	EnumRandomBytes  Enum = "r"
-	EnumWaitTimeout  Enum = "wt"
-	EnumWaitResponse Enum = "wr"
+	BytesEnumTag        EnumTag = "b"
+	CounterEnumTag      EnumTag = "c"
+	TimestampEnumTag    EnumTag = "t"
+	RandomBytesEnumTag  EnumTag = "r"
+	WaitTimeoutEnumTag  EnumTag = "wt"
+	WaitResponseEnumTag EnumTag = "wr"
 )
 
-var validEnum = map[Enum]newGenerator{
-	EnumBytes:        newBytesGenerator,
-	EnumCounter:      func(s string) (Generator, error) { return &BytesGenerator{}, nil },
-	EnumTimestamp:    newTimestampGenerator,
-	EnumRandomBytes:  newRandomPacketGenerator,
-	EnumWaitTimeout:  func(s string) (Generator, error) { return &BytesGenerator{}, nil },
-	EnumWaitResponse: func(s string) (Generator, error) { return &BytesGenerator{}, nil },
+var generatorCreator = map[EnumTag]newGenerator{
+	BytesEnumTag:        newBytesGenerator,
+	CounterEnumTag:      func(s string) (Generator, error) { return &BytesGenerator{}, nil },
+	TimestampEnumTag:    newTimestampGenerator,
+	RandomBytesEnumTag:  newRandomPacketGenerator,
+	WaitTimeoutEnumTag:  newWaitTimeoutGenerator,
+	WaitResponseEnumTag: func(s string) (Generator, error) { return &BytesGenerator{}, nil },
 }
 
-type Foo struct {
-	x []Generator
+// helper map to determine enumTags are unique
+var uniqueTags = map[EnumTag]bool{
+	CounterEnumTag:   false,
+	TimestampEnumTag: false,
 }
 
 type Tag struct {
-	Name  Enum
+	Name  EnumTag
 	Param string
 }
 
@@ -41,7 +44,7 @@ func parseTag(input string) (Tag, error) {
 
 	match := re.FindStringSubmatch(input)
 	tag := Tag{
-		Name: Enum(match[1]),
+		Name: EnumTag(match[1]),
 	}
 	if len(match) > 2 && match[2] != "" {
 		tag.Param = strings.TrimSpace(match[2])
@@ -50,35 +53,43 @@ func parseTag(input string) (Tag, error) {
 	return tag, nil
 }
 
-func Parse(input string) (Foo, error) {
+// TODO: pointernes
+func Parse(name, input string) (TaggedJunkGenerator, error) {
 	inputSlice := strings.Split(input, "<")
-	fmt.Printf("%v\n", inputSlice)
 	if len(inputSlice) <= 1 {
-		return Foo{}, fmt.Errorf("empty input: %s", input)
+		return TaggedJunkGenerator{}, fmt.Errorf("empty input: %s", input)
 	}
+
+	uniqueTagCheck := make(map[EnumTag]bool, len(uniqueTags))
+	maps.Copy(uniqueTagCheck, uniqueTags)
 
 	// skip byproduct of split
 	inputSlice = inputSlice[1:]
-	rv := Foo{x: make([]Generator, 0, len(inputSlice))}
-
+	rv := newTagedJunkGenerator(name, len(inputSlice))
 	for _, inputParam := range inputSlice {
 		if len(inputParam) <= 1 {
-			return Foo{}, fmt.Errorf("empty tag in input: %s", inputSlice)
+			return TaggedJunkGenerator{}, fmt.Errorf("empty tag in input: %s", inputSlice)
 		} else if strings.Count(inputParam, ">") != 1 {
-			return Foo{}, fmt.Errorf("ill formated input: %s", input)
+			return TaggedJunkGenerator{}, fmt.Errorf("ill formated input: %s", input)
 		}
 
 		tag, _ := parseTag(inputParam)
-		fmt.Printf("Tag: %s, Param: %s\n", tag.Name, tag.Param)
-		gen, ok := validEnum[tag.Name]
+		creator, ok := generatorCreator[tag.Name]
 		if !ok {
-			return Foo{}, fmt.Errorf("invalid tag: %s", tag.Name)
+			return TaggedJunkGenerator{}, fmt.Errorf("invalid tag: %s", tag.Name)
 		}
-		generator, err := gen(tag.Param)
+		if present, ok := uniqueTagCheck[tag.Name]; ok {
+			if present {
+				return TaggedJunkGenerator{}, fmt.Errorf("tag %s needs to be unique", tag.Name)
+			}
+			uniqueTagCheck[tag.Name] = true
+		}
+		generator, err := creator(tag.Param)
 		if err != nil {
-			return Foo{}, fmt.Errorf("gen: %w", err)
+			return TaggedJunkGenerator{}, fmt.Errorf("gen: %w", err)
 		}
-		rv.x = append(rv.x, generator)
+
+		rv.append(generator)
 	}
 
 	return rv, nil
