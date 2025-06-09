@@ -4,12 +4,12 @@ go 1.24
 
 require (
 	github.com/stretchr/testify v1.10.0
-	github.com/tevino/abool/v2 v2.1.0
+	github.com/tevino/abool v1.2.0
 	golang.org/x/crypto v0.36.0
 	golang.org/x/net v0.37.0
 	golang.org/x/sys v0.31.0
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2
-	gvisor.dev/gvisor v0.0.0-20250130013005-04f9204697c6
+	gvisor.dev/gvisor v0.0.0-20250606233247-e3c4c4cad86f
 )
 
 require (

@@ -1,4 +1,4 @@
-package junktag
+package awg
 
 import (
 	"errors"
@@ -6,13 +6,14 @@ import (
 )
 
 type SpecialHandshakeHandler struct {
-	SpecialJunk    TaggedJunkGeneratorHandler
-	ControlledJunk TaggedJunkGeneratorHandler
+	SpecialJunk    TagJunkGeneratorHandler
+	ControlledJunk TagJunkGeneratorHandler
 
 	nextItime time.Time
 	ITimeout  time.Duration // seconds
 	// TODO: maybe atomic?
 	PacketCounter uint64
+	IsSet         bool
 }
 
 func (handler *SpecialHandshakeHandler) Validate() error {

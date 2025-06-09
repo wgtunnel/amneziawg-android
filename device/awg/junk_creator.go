@@ -1,4 +1,4 @@
-package device
+package awg
 
 import (
 	"bytes"
@@ -8,33 +8,32 @@ import (
 )
 
 type junkCreator struct {
-	device   *Device
+	aSecCfg  aSecCfgType
 	cha8Rand *v2.ChaCha8
 }
 
-func NewJunkCreator(d *Device) (junkCreator, error) {
+func NewJunkCreator(aSecCfg aSecCfgType) (junkCreator, error) {
 	buf := make([]byte, 32)
 	_, err := crand.Read(buf)
 	if err != nil {
 		return junkCreator{}, err
 	}
-	return junkCreator{device: d, cha8Rand: v2.NewChaCha8([32]byte(buf))}, nil
+	return junkCreator{aSecCfg: aSecCfg, cha8Rand: v2.NewChaCha8([32]byte(buf))}, nil
 }
 
 // Should be called with aSecMux RLocked
-func (jc *junkCreator) createJunkPackets(junks *[][]byte) error {
-	if jc.device.awg.aSecCfg.junkPacketCount == 0 {
+func (jc *junkCreator) CreateJunkPackets(junks [][]byte) error {
+	if jc.aSecCfg.JunkPacketCount == 0 {
 		return nil
 	}
 
-	*junks = make([][]byte, len(*junks)+jc.device.awg.aSecCfg.junkPacketCount)
-	for i := range jc.device.awg.aSecCfg.junkPacketCount {
+	for i := range jc.aSecCfg.JunkPacketCount {
 		packetSize := jc.randomPacketSize()
 		junk, err := jc.randomJunkWithSize(packetSize)
 		if err != nil {
 			return fmt.Errorf("create junk packet: %v", err)
 		}
-		(*junks)[i] = junk
+		junks[i] = junk
 	}
 	return nil
 }
@@ -43,13 +42,13 @@ func (jc *junkCreator) createJunkPackets(junks *[][]byte) error {
 func (jc *junkCreator) randomPacketSize() int {
 	return int(
 		jc.cha8Rand.Uint64()%uint64(
-			jc.device.awg.aSecCfg.junkPacketMaxSize-jc.device.awg.aSecCfg.junkPacketMinSize,
+			jc.aSecCfg.JunkPacketMaxSize-jc.aSecCfg.JunkPacketMinSize,
 		),
-	) + jc.device.awg.aSecCfg.junkPacketMinSize
+	) + jc.aSecCfg.JunkPacketMinSize
 }
 
 // Should be called with aSecMux RLocked
-func (jc *junkCreator) appendJunk(writer *bytes.Buffer, size int) error {
+func (jc *junkCreator) AppendJunk(writer *bytes.Buffer, size int) error {
 	headerJunk, err := jc.randomJunkWithSize(size)
 	if err != nil {
 		return fmt.Errorf("create header junk: %v", err)

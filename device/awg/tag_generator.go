@@ -1,4 +1,4 @@
-package junktag
+package awg
 
 import (
 	crand "crypto/rand"

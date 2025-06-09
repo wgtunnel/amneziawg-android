@@ -129,7 +129,7 @@ func (device *Device) RoutineReceiveIncoming(
 		}
 		deathSpiral = 0
 
-		device.awg.aSecMux.RLock()
+		device.awg.ASecMux.RLock()
 		// handle each packet in the batch
 		for i, size := range sizes[:count] {
 			if size < MinMessageSize {
@@ -246,7 +246,7 @@ func (device *Device) RoutineReceiveIncoming(
 			default:
 			}
 		}
-		device.awg.aSecMux.RUnlock()
+		device.awg.ASecMux.RUnlock()
 		for peer, elemsContainer := range elemsByPeer {
 			if peer.isRunning.Load() {
 				peer.queue.inbound.c <- elemsContainer
@@ -305,7 +305,7 @@ func (device *Device) RoutineHandshake(id int) {
 
 	for elem := range device.queue.handshake.c {
 
-		device.awg.aSecMux.RLock()
+		device.awg.ASecMux.RLock()
 
 		// handle cookie fields and ratelimiting
 
@@ -457,7 +457,7 @@ func (device *Device) RoutineHandshake(id int) {
 			peer.SendKeepalive()
 		}
 	skip:
-		device.awg.aSecMux.RUnlock()
+		device.awg.ASecMux.RUnlock()
 		device.PutMessageBuffer(elem.buffer)
 	}
 }

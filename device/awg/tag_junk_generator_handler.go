@@ -1,19 +1,21 @@
-package junktag
+package awg
 
 import "fmt"
 
-type TaggedJunkGeneratorHandler struct {
-	generators []TaggedJunkGenerator
+type TagJunkGeneratorHandler struct {
+	generators []TagJunkGenerator
 	length     int
+	// Jc
+	DefaultJunkCount int
 }
 
-func (handler *TaggedJunkGeneratorHandler) AppendGenerator(generators TaggedJunkGenerator) {
+func (handler *TagJunkGeneratorHandler) AppendGenerator(generators TagJunkGenerator) {
 	handler.generators = append(handler.generators, generators)
 	handler.length++
 }
 
 // validate that packets were defined consecutively
-func (handler *TaggedJunkGeneratorHandler) Validate() error {
+func (handler *TagJunkGeneratorHandler) Validate() error {
 	seen := make([]bool, len(handler.generators))
 	for _, generator := range handler.generators {
 		if index, err := generator.nameIndex(); err != nil {
@@ -32,8 +34,8 @@ func (handler *TaggedJunkGeneratorHandler) Validate() error {
 	return nil
 }
 
-func (handler *TaggedJunkGeneratorHandler) Generate() [][]byte {
-	var rv = make([][]byte, handler.length)
+func (handler *TagJunkGeneratorHandler) Generate() [][]byte {
+	var rv = make([][]byte, handler.length+handler.DefaultJunkCount)
 	for i, generator := range handler.generators {
 		rv[i] = make([]byte, generator.packetSize)
 		copy(rv[i], generator.generate())

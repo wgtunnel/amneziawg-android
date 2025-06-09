@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	junktag "github.com/amnezia-vpn/amneziawg-go/device/internal/junk-tag"
+	"github.com/amnezia-vpn/amneziawg-go/device/awg"
 	"github.com/amnezia-vpn/amneziawg-go/ipc"
 )
 
@@ -99,33 +99,37 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 		}
 
 		if device.isAdvancedSecurityOn() {
-			if device.awg.aSecCfg.junkPacketCount != 0 {
-				sendf("jc=%d", device.awg.aSecCfg.junkPacketCount)
+			if device.awg.ASecCfg.JunkPacketCount != 0 {
+				sendf("jc=%d", device.awg.ASecCfg.JunkPacketCount)
 			}
-			if device.awg.aSecCfg.junkPacketMinSize != 0 {
-				sendf("jmin=%d", device.awg.aSecCfg.junkPacketMinSize)
+			if device.awg.ASecCfg.JunkPacketMinSize != 0 {
+				sendf("jmin=%d", device.awg.ASecCfg.JunkPacketMinSize)
 			}
-			if device.awg.aSecCfg.junkPacketMaxSize != 0 {
-				sendf("jmax=%d", device.awg.aSecCfg.junkPacketMaxSize)
+			if device.awg.ASecCfg.JunkPacketMaxSize != 0 {
+				sendf("jmax=%d", device.awg.ASecCfg.JunkPacketMaxSize)
 			}
-			if device.awg.aSecCfg.initPacketJunkSize != 0 {
-				sendf("s1=%d", device.awg.aSecCfg.initPacketJunkSize)
+			if device.awg.ASecCfg.InitPacketJunkSize != 0 {
+				sendf("s1=%d", device.awg.ASecCfg.InitPacketJunkSize)
 			}
-			if device.awg.aSecCfg.responsePacketJunkSize != 0 {
-				sendf("s2=%d", device.awg.aSecCfg.responsePacketJunkSize)
+			if device.awg.ASecCfg.ResponsePacketJunkSize != 0 {
+				sendf("s2=%d", device.awg.ASecCfg.ResponsePacketJunkSize)
 			}
-			if device.awg.aSecCfg.initPacketMagicHeader != 0 {
-				sendf("h1=%d", device.awg.aSecCfg.initPacketMagicHeader)
+			if device.awg.ASecCfg.InitPacketMagicHeader != 0 {
+				sendf("h1=%d", device.awg.ASecCfg.InitPacketMagicHeader)
 			}
-			if device.awg.aSecCfg.responsePacketMagicHeader != 0 {
-				sendf("h2=%d", device.awg.aSecCfg.responsePacketMagicHeader)
+			if device.awg.ASecCfg.ResponsePacketMagicHeader != 0 {
+				sendf("h2=%d", device.awg.ASecCfg.ResponsePacketMagicHeader)
 			}
-			if device.awg.aSecCfg.underloadPacketMagicHeader != 0 {
-				sendf("h3=%d", device.awg.aSecCfg.underloadPacketMagicHeader)
+			if device.awg.ASecCfg.UnderloadPacketMagicHeader != 0 {
+				sendf("h3=%d", device.awg.ASecCfg.UnderloadPacketMagicHeader)
 			}
-			if device.awg.aSecCfg.transportPacketMagicHeader != 0 {
-				sendf("h4=%d", device.awg.aSecCfg.transportPacketMagicHeader)
+			if device.awg.ASecCfg.TransportPacketMagicHeader != 0 {
+				sendf("h4=%d", device.awg.ASecCfg.TransportPacketMagicHeader)
 			}
+
+			// for _, generator := range device.awg.HandshakeHandler.ControlledJunk.AppendGenerator {
+			// 	sendf("h4=%d", device.awg.ASecCfg.TransportPacketMagicHeader)
+			// }
 		}
 
 		for _, peer := range device.peers.keyMap {
@@ -181,7 +185,7 @@ func (device *Device) IpcSetOperation(r io.Reader) (err error) {
 	peer := new(ipcSetPeer)
 	deviceConfig := true
 
-	tempAwg := awg{}
+	tempAwg := awg.Protocol{}
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -238,7 +242,7 @@ func (device *Device) IpcSetOperation(r io.Reader) (err error) {
 	return nil
 }
 
-func (device *Device) handleDeviceLine(key, value string, tempAwg *awg) error {
+func (device *Device) handleDeviceLine(key, value string, tempAwg *awg.Protocol) error {
 	switch key {
 	case "private_key":
 		var sk NoisePrivateKey
@@ -290,8 +294,8 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg) error {
 			return ipcErrorf(ipc.IpcErrorInvalid, "parse junk_packet_count %w", err)
 		}
 		device.log.Verbosef("UAPI: Updating junk_packet_count")
-		tempAwg.aSecCfg.junkPacketCount = junkPacketCount
-		tempAwg.aSecCfg.isSet = true
+		tempAwg.ASecCfg.JunkPacketCount = junkPacketCount
+		tempAwg.ASecCfg.IsSet = true
 
 	case "jmin":
 		junkPacketMinSize, err := strconv.Atoi(value)
@@ -299,8 +303,8 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg) error {
 			return ipcErrorf(ipc.IpcErrorInvalid, "parse junk_packet_min_size %w", err)
 		}
 		device.log.Verbosef("UAPI: Updating junk_packet_min_size")
-		tempAwg.aSecCfg.junkPacketMinSize = junkPacketMinSize
-		tempAwg.aSecCfg.isSet = true
+		tempAwg.ASecCfg.JunkPacketMinSize = junkPacketMinSize
+		tempAwg.ASecCfg.IsSet = true
 
 	case "jmax":
 		junkPacketMaxSize, err := strconv.Atoi(value)
@@ -308,8 +312,8 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg) error {
 			return ipcErrorf(ipc.IpcErrorInvalid, "parse junk_packet_max_size %w", err)
 		}
 		device.log.Verbosef("UAPI: Updating junk_packet_max_size")
-		tempAwg.aSecCfg.junkPacketMaxSize = junkPacketMaxSize
-		tempAwg.aSecCfg.isSet = true
+		tempAwg.ASecCfg.JunkPacketMaxSize = junkPacketMaxSize
+		tempAwg.ASecCfg.IsSet = true
 
 	case "s1":
 		initPacketJunkSize, err := strconv.Atoi(value)
@@ -317,8 +321,8 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg) error {
 			return ipcErrorf(ipc.IpcErrorInvalid, "parse init_packet_junk_size %w", err)
 		}
 		device.log.Verbosef("UAPI: Updating init_packet_junk_size")
-		tempAwg.aSecCfg.initPacketJunkSize = initPacketJunkSize
-		tempAwg.aSecCfg.isSet = true
+		tempAwg.ASecCfg.InitPacketJunkSize = initPacketJunkSize
+		tempAwg.ASecCfg.IsSet = true
 
 	case "s2":
 		responsePacketJunkSize, err := strconv.Atoi(value)
@@ -326,65 +330,65 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg) error {
 			return ipcErrorf(ipc.IpcErrorInvalid, "parse response_packet_junk_size %w", err)
 		}
 		device.log.Verbosef("UAPI: Updating response_packet_junk_size")
-		tempAwg.aSecCfg.responsePacketJunkSize = responsePacketJunkSize
-		tempAwg.aSecCfg.isSet = true
+		tempAwg.ASecCfg.ResponsePacketJunkSize = responsePacketJunkSize
+		tempAwg.ASecCfg.IsSet = true
 
 	case "h1":
 		initPacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "parse init_packet_magic_header %w", err)
 		}
-		tempAwg.aSecCfg.initPacketMagicHeader = uint32(initPacketMagicHeader)
-		tempAwg.aSecCfg.isSet = true
+		tempAwg.ASecCfg.InitPacketMagicHeader = uint32(initPacketMagicHeader)
+		tempAwg.ASecCfg.IsSet = true
 
 	case "h2":
 		responsePacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "parse response_packet_magic_header %w", err)
 		}
-		tempAwg.aSecCfg.responsePacketMagicHeader = uint32(responsePacketMagicHeader)
-		tempAwg.aSecCfg.isSet = true
+		tempAwg.ASecCfg.ResponsePacketMagicHeader = uint32(responsePacketMagicHeader)
+		tempAwg.ASecCfg.IsSet = true
 
 	case "h3":
 		underloadPacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "parse underload_packet_magic_header %w", err)
 		}
-		tempAwg.aSecCfg.underloadPacketMagicHeader = uint32(underloadPacketMagicHeader)
-		tempAwg.aSecCfg.isSet = true
+		tempAwg.ASecCfg.UnderloadPacketMagicHeader = uint32(underloadPacketMagicHeader)
+		tempAwg.ASecCfg.IsSet = true
 
 	case "h4":
 		transportPacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "parse transport_packet_magic_header %w", err)
 		}
-		tempAwg.aSecCfg.transportPacketMagicHeader = uint32(transportPacketMagicHeader)
-		tempAwg.aSecCfg.isSet = true
+		tempAwg.ASecCfg.TransportPacketMagicHeader = uint32(transportPacketMagicHeader)
+		tempAwg.ASecCfg.IsSet = true
 	case "i1", "i2", "i3", "i4", "i5":
 		if len(value) == 0 {
 			return ipcErrorf(ipc.IpcErrorInvalid, "%s should be non null", key)
 		}
 
-		generators, err := junktag.Parse(key, value)
+		generators, err := awg.Parse(key, value)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "invalid %s: %w", key, err)
 		}
 		device.log.Verbosef("UAPI: Updating %s", key)
-		tempAwg.handshakeHandler.SpecialJunk.AppendGenerator(generators)
-		tempAwg.aSecCfg.isSet = true
+		tempAwg.HandshakeHandler.SpecialJunk.AppendGenerator(generators)
+		tempAwg.HandshakeHandler.IsSet = true
 	case "j1", "j2", "j3":
 		if len(value) == 0 {
 			return ipcErrorf(ipc.IpcErrorInvalid, "%s should be non null", key)
 		}
 
-		generators, err := junktag.Parse(key, value)
+		generators, err := awg.Parse(key, value)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "invalid %s: %w", key, err)
 		}
 		device.log.Verbosef("UAPI: Updating %s", key)
 
-		tempAwg.handshakeHandler.ControlledJunk.AppendGenerator(generators)
-		tempAwg.aSecCfg.isSet = true
+		tempAwg.HandshakeHandler.ControlledJunk.AppendGenerator(generators)
+		tempAwg.HandshakeHandler.IsSet = true
 	case "itime":
 		itime, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
@@ -392,8 +396,8 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg) error {
 		}
 		device.log.Verbosef("UAPI: Updating itime %s", itime)
 
-		tempAwg.handshakeHandler.ITimeout = time.Duration(itime)
-		tempAwg.aSecCfg.isSet = true
+		tempAwg.HandshakeHandler.ITimeout = time.Duration(itime)
+		tempAwg.HandshakeHandler.IsSet = true
 	default:
 		return ipcErrorf(ipc.IpcErrorInvalid, "invalid UAPI device key: %v", key)
 	}

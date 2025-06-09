@@ -1,4 +1,4 @@
-package junktag
+package awg
 
 import (
 	"fmt"
@@ -54,10 +54,10 @@ func parseTag(input string) (Tag, error) {
 }
 
 // TODO: pointernes
-func Parse(name, input string) (TaggedJunkGenerator, error) {
+func Parse(name, input string) (TagJunkGenerator, error) {
 	inputSlice := strings.Split(input, "<")
 	if len(inputSlice) <= 1 {
-		return TaggedJunkGenerator{}, fmt.Errorf("empty input: %s", input)
+		return TagJunkGenerator{}, fmt.Errorf("empty input: %s", input)
 	}
 
 	uniqueTagCheck := make(map[EnumTag]bool, len(uniqueTags))
@@ -65,28 +65,28 @@ func Parse(name, input string) (TaggedJunkGenerator, error) {
 
 	// skip byproduct of split
 	inputSlice = inputSlice[1:]
-	rv := newTagedJunkGenerator(name, len(inputSlice))
+	rv := newTagJunkGenerator(name, len(inputSlice))
 	for _, inputParam := range inputSlice {
 		if len(inputParam) <= 1 {
-			return TaggedJunkGenerator{}, fmt.Errorf("empty tag in input: %s", inputSlice)
+			return TagJunkGenerator{}, fmt.Errorf("empty tag in input: %s", inputSlice)
 		} else if strings.Count(inputParam, ">") != 1 {
-			return TaggedJunkGenerator{}, fmt.Errorf("ill formated input: %s", input)
+			return TagJunkGenerator{}, fmt.Errorf("ill formated input: %s", input)
 		}
 
 		tag, _ := parseTag(inputParam)
 		creator, ok := generatorCreator[tag.Name]
 		if !ok {
-			return TaggedJunkGenerator{}, fmt.Errorf("invalid tag: %s", tag.Name)
+			return TagJunkGenerator{}, fmt.Errorf("invalid tag: %s", tag.Name)
 		}
 		if present, ok := uniqueTagCheck[tag.Name]; ok {
 			if present {
-				return TaggedJunkGenerator{}, fmt.Errorf("tag %s needs to be unique", tag.Name)
+				return TagJunkGenerator{}, fmt.Errorf("tag %s needs to be unique", tag.Name)
 			}
 			uniqueTagCheck[tag.Name] = true
 		}
 		generator, err := creator(tag.Param)
 		if err != nil {
-			return TaggedJunkGenerator{}, fmt.Errorf("gen: %w", err)
+			return TagJunkGenerator{}, fmt.Errorf("gen: %w", err)
 		}
 
 		rv.append(generator)

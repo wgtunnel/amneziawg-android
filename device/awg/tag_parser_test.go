@@ -1,4 +1,4 @@
-package junktag
+package awg
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 
 func TestParse(t *testing.T) {
 	type args struct {
+		name  string
 		input string
 	}
 	tests := []struct {
@@ -17,38 +18,43 @@ func TestParse(t *testing.T) {
 		wantErr error
 	}{
 		{
+			name:    "invalid name",
+			args:    args{name: "apple", input: ""},
+			wantErr: fmt.Errorf("ill formated input"),
+		},
+		{
 			name:    "empty",
-			args:    args{input: ""},
+			args:    args{name: "i1", input: ""},
 			wantErr: fmt.Errorf("ill formated input"),
 		},
 		{
 			name:    "extra >",
-			args:    args{input: "<b 0xf6ab3267fa><c>>"},
+			args:    args{name: "i1", input: "<b 0xf6ab3267fa><c>>"},
 			wantErr: fmt.Errorf("ill formated input"),
 		},
 		{
 			name:    "extra <",
-			args:    args{input: "<<b 0xf6ab3267fa><c>"},
+			args:    args{name: "i1", input: "<<b 0xf6ab3267fa><c>"},
 			wantErr: fmt.Errorf("empty tag in input"),
 		},
 		{
 			name:    "empty <>",
-			args:    args{input: "<><b 0xf6ab3267fa><c>"},
+			args:    args{name: "i1", input: "<><b 0xf6ab3267fa><c>"},
 			wantErr: fmt.Errorf("empty tag in input"),
 		},
 		{
 			name:    "invalid tag",
-			args:    args{input: "<q 0xf6ab3267fa>"},
+			args:    args{name: "i1", input: "<q 0xf6ab3267fa>"},
 			wantErr: fmt.Errorf("invalid tag"),
 		},
 		{
 			name:    "counter uniqueness violation",
-			args:    args{input: "<c><c>"},
+			args:    args{name: "i1", input: "<c><c>"},
 			wantErr: fmt.Errorf("parse tag needs to be unique"),
 		},
 		{
 			name:    "timestamp uniqueness violation",
-			args:    args{input: "<t><t>"},
+			args:    args{name: "i1", input: "<t><t>"},
 			wantErr: fmt.Errorf("parse tag needs to be unique"),
 		},
 		{
@@ -58,7 +64,7 @@ func TestParse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := Parse(tt.args.input)
+			_, err := Parse(tt.args.name, tt.args.input)
 
 			// TODO:  ErrorAs doesn't work as you think
 			if tt.wantErr != nil {
