@@ -11,6 +11,7 @@ type SpecialHandshakeHandler struct {
 
 	nextItime time.Time
 	ITimeout  time.Duration // seconds
+
 	// TODO: maybe atomic?
 	PacketCounter uint64
 	IsSet         bool
@@ -33,7 +34,7 @@ func (handler *SpecialHandshakeHandler) GenerateSpecialJunk() [][]byte {
 		return nil
 	}
 
-	rv := handler.SpecialJunk.Generate()
+	rv := handler.SpecialJunk.GeneratePackets()
 
 	handler.nextItime = time.Now().Add(time.Duration(handler.ITimeout))
 
@@ -45,5 +46,5 @@ func (handler *SpecialHandshakeHandler) isTimeToSendSpecial() bool {
 }
 
 func (handler *SpecialHandshakeHandler) PrepareControlledJunk() [][]byte {
-	return handler.ControlledJunk.Generate()
+	return handler.ControlledJunk.GeneratePackets()
 }

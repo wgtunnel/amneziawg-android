@@ -18,7 +18,11 @@ func (handler *TagJunkGeneratorHandler) AppendGenerator(generators TagJunkGenera
 func (handler *TagJunkGeneratorHandler) Validate() error {
 	seen := make([]bool, len(handler.generators))
 	for _, generator := range handler.generators {
-		if index, err := generator.nameIndex(); err != nil {
+		index, err := generator.nameIndex()
+		if index > len(handler.generators) {
+			return fmt.Errorf("junk packet index should be consecutive")
+		}
+		if err != nil {
 			return fmt.Errorf("name index: %w", err)
 		} else {
 			seen[index-1] = true
@@ -34,11 +38,11 @@ func (handler *TagJunkGeneratorHandler) Validate() error {
 	return nil
 }
 
-func (handler *TagJunkGeneratorHandler) Generate() [][]byte {
+func (handler *TagJunkGeneratorHandler) GeneratePackets() [][]byte {
 	var rv = make([][]byte, handler.length+handler.DefaultJunkCount)
 	for i, generator := range handler.generators {
 		rv[i] = make([]byte, generator.packetSize)
-		copy(rv[i], generator.generate())
+		copy(rv[i], generator.generatePacket())
 	}
 
 	return rv
