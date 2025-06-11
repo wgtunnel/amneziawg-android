@@ -1,6 +1,7 @@
 package awg
 
 import (
+	"encoding/binary"
 	"fmt"
 	"testing"
 
@@ -32,7 +33,14 @@ func Test_newBytesGenerator(t *testing.T) {
 			wantErr: fmt.Errorf("not correct hex"),
 		},
 		{
-			name: "not only hex value",
+			name: "not only hex value with X",
+			args: args{
+				param: "0X12345q",
+			},
+			wantErr: fmt.Errorf("not correct hex"),
+		},
+		{
+			name: "not only hex value with x",
 			args: args{
 				param: "0x12345q",
 			},
@@ -124,6 +132,58 @@ func Test_newRandomPacketGenerator(t *testing.T) {
 
 			second := got.Generate()
 			require.NotEqual(t, first, second)
+		})
+	}
+}
+
+func TestPacketCounterGenerator(t *testing.T) {
+	tests := []struct {
+		name    string
+		param   string
+		wantErr bool
+	}{
+		{
+			name:    "Valid empty param",
+			param:   "",
+			wantErr: false,
+		},
+		{
+			name:    "Invalid non-empty param",
+			param:   "anything",
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc // capture range variable
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			gen, err := newPacketCounterGenerator(tc.param)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, 8, gen.Size())
+
+			// Reset counter to known value for test
+			initialCount := uint64(42)
+			PacketCounter.Store(initialCount)
+
+			output := gen.Generate()
+			require.Equal(t, 8, len(output))
+
+			// Verify counter value in output
+			counterValue := binary.BigEndian.Uint64(output)
+			require.Equal(t, initialCount, counterValue)
+
+			// Increment counter and verify change
+			PacketCounter.Add(1)
+			output = gen.Generate()
+			counterValue = binary.BigEndian.Uint64(output)
+			require.Equal(t, initialCount+1, counterValue)
 		})
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	v2 "math/rand/v2"
+	// "go.uber.org/atomic"
 )
 
 type Generator interface {
@@ -33,9 +34,8 @@ func (bg *BytesGenerator) Size() int {
 }
 
 func newBytesGenerator(param string) (Generator, error) {
-	isNotHex := !strings.HasPrefix(param, "0x") ||
-		!strings.HasPrefix(param, "0x") && !isHexString(param)
-	if isNotHex {
+	hasPrefix := strings.HasPrefix(param, "0x") || strings.HasPrefix(param, "0X")
+	if !hasPrefix {
 		return nil, fmt.Errorf("not correct hex: %s", param)
 	}
 
@@ -45,17 +45,6 @@ func newBytesGenerator(param string) (Generator, error) {
 	}
 
 	return &BytesGenerator{value: hex, size: len(hex)}, nil
-}
-
-func isHexString(s string) bool {
-	for _, char := range s {
-		if !((char >= '0' && char <= '9') ||
-			(char >= 'a' && char <= 'f') ||
-			(char >= 'A' && char <= 'F')) {
-			return false
-		}
-	}
-	return len(s) > 0
 }
 
 func hexToBytes(hexStr string) ([]byte, error) {
@@ -110,6 +99,7 @@ type TimestampGenerator struct {
 func (tg *TimestampGenerator) Generate() []byte {
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix()))
+	fmt.Printf("timestamp: %v\n", buf)
 	return buf
 }
 
@@ -130,6 +120,7 @@ type WaitTimeoutGenerator struct {
 }
 
 func (wtg *WaitTimeoutGenerator) Generate() []byte {
+	fmt.Printf("sleep: %d\n", wtg.waitTimeout.Milliseconds())
 	time.Sleep(wtg.waitTimeout)
 	return []byte{}
 }
@@ -139,14 +130,39 @@ func (wtg *WaitTimeoutGenerator) Size() int {
 }
 
 func newWaitTimeoutGenerator(param string) (Generator, error) {
-	size, err := strconv.Atoi(param)
+	t, err := strconv.Atoi(param)
 	if err != nil {
 		return nil, fmt.Errorf("timeout parse int: %w", err)
 	}
 
-	if size > 5000 {
-		return nil, fmt.Errorf("timeout size must be less than 5000ms")
+	if t > 5000 {
+		return nil, fmt.Errorf("timeout must be less than 5000ms")
 	}
 
-	return &WaitTimeoutGenerator{}, nil
+	return &WaitTimeoutGenerator{waitTimeout: time.Duration(t) * time.Millisecond}, nil
+}
+
+type PacketCounterGenerator struct {
+	// counter *atomic.Uint64
+}
+
+func (c *PacketCounterGenerator) Generate() []byte {
+	buf := make([]byte, 8)
+	// TODO: better way to handle counter tag
+	binary.BigEndian.PutUint64(buf, PacketCounter.Load())
+	fmt.Printf("packet %d; counter: %v\n", PacketCounter.Load(), buf)
+	return buf
+}
+
+func (c *PacketCounterGenerator) Size() int {
+	return 8
+}
+
+func newPacketCounterGenerator(param string) (Generator, error) {
+	if len(param) != 0 {
+		return nil, fmt.Errorf("packet counter param needs to be empty: %s", param)
+	}
+
+	// return &PacketCounterGenerator{counter: atomic.NewUint64(0)}, nil
+	return &PacketCounterGenerator{}, nil
 }

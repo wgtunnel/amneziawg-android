@@ -12,7 +12,7 @@ type TagJunkGenerator struct {
 }
 
 func newTagJunkGenerator(name string, size int) TagJunkGenerator {
-	return TagJunkGenerator{name: name, generators: make([]Generator, size)}
+	return TagJunkGenerator{name: name, generators: make([]Generator, 0, size)}
 }
 
 func (tg *TagJunkGenerator) append(generator Generator) {
@@ -40,7 +40,7 @@ func (tg *TagJunkGenerator) nameIndex() (int, error) {
 
 	index, err := strconv.Atoi(tg.name[1:2])
 	if err != nil {
-		return 0, fmt.Errorf("name should be 2 char long: %w", err)
+		return 0, fmt.Errorf("name 2 char should be an int %w", err)
 	}
 	return index, nil
 }

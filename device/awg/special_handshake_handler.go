@@ -3,18 +3,22 @@ package awg
 import (
 	"errors"
 	"time"
+
+	"go.uber.org/atomic"
 )
 
+// TODO: atomic/ and better way to use this
+var PacketCounter *atomic.Uint64 = atomic.NewUint64(0)
+
 type SpecialHandshakeHandler struct {
+	isFirstDone    bool
 	SpecialJunk    TagJunkGeneratorHandler
 	ControlledJunk TagJunkGeneratorHandler
 
 	nextItime time.Time
 	ITimeout  time.Duration // seconds
 
-	// TODO: maybe atomic?
-	PacketCounter uint64
-	IsSet         bool
+	IsSet bool
 }
 
 func (handler *SpecialHandshakeHandler) Validate() error {
@@ -29,13 +33,21 @@ func (handler *SpecialHandshakeHandler) Validate() error {
 }
 
 func (handler *SpecialHandshakeHandler) GenerateSpecialJunk() [][]byte {
-	// TODO: distiungish between first and the rest of the packets
+	if !handler.SpecialJunk.IsDefined() {
+		return nil
+	}
+	// TODO: create tests
+	if !handler.isFirstDone {
+		handler.isFirstDone = true
+		handler.nextItime = time.Now().Add(time.Duration(handler.ITimeout))
+		return nil
+	}
+
 	if !handler.isTimeToSendSpecial() {
 		return nil
 	}
 
 	rv := handler.SpecialJunk.GeneratePackets()
-
 	handler.nextItime = time.Now().Add(time.Duration(handler.ITimeout))
 
 	return rv
@@ -45,6 +57,10 @@ func (handler *SpecialHandshakeHandler) isTimeToSendSpecial() bool {
 	return time.Now().After(handler.nextItime)
 }
 
-func (handler *SpecialHandshakeHandler) PrepareControlledJunk() [][]byte {
+func (handler *SpecialHandshakeHandler) GenerateControlledJunk() [][]byte {
+	if !handler.ControlledJunk.IsDefined() {
+		return nil
+	}
+
 	return handler.ControlledJunk.GeneratePackets()
 }

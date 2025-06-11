@@ -8,8 +8,6 @@ import (
 )
 
 func TestTagJunkGeneratorHandlerAppendGenerator(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name      string
 		generator TagJunkGenerator
@@ -28,20 +26,18 @@ func TestTagJunkGeneratorHandlerAppendGenerator(t *testing.T) {
 
 			// Initial length should be 0
 			require.Equal(t, 0, handler.length)
-			require.Empty(t, handler.generators)
+			require.Empty(t, handler.tagGenerators)
 
 			// After append, length should be 1 and generator should be added
 			handler.AppendGenerator(tt.generator)
 			require.Equal(t, 1, handler.length)
-			require.Len(t, handler.generators, 1)
-			require.Equal(t, tt.generator, handler.generators[0])
+			require.Len(t, handler.tagGenerators, 1)
+			require.Equal(t, tt.generator, handler.tagGenerators[0])
 		})
 	}
 }
 
 func TestTagJunkGeneratorHandlerValidate(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name       string
 		generators []TagJunkGenerator
@@ -49,12 +45,13 @@ func TestTagJunkGeneratorHandlerValidate(t *testing.T) {
 		errMsg     string
 	}{
 		{
-			name: "valid consecutive indices",
+			name: "bad start",
 			generators: []TagJunkGenerator{
-				newTagJunkGenerator("t1", 10),
-				newTagJunkGenerator("t2", 10),
+				newTagJunkGenerator("t3", 10),
+				newTagJunkGenerator("t4", 10),
 			},
-			wantErr: false,
+			wantErr: true,
+			errMsg:  "junk packet index should be consecutive",
 		},
 		{
 			name: "non-consecutive indices",
@@ -64,6 +61,16 @@ func TestTagJunkGeneratorHandlerValidate(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "junk packet index should be consecutive",
+		},
+		{
+			name: "consecutive indices",
+			generators: []TagJunkGenerator{
+				newTagJunkGenerator("t1", 10),
+				newTagJunkGenerator("t2", 10),
+				newTagJunkGenerator("t3", 10),
+				newTagJunkGenerator("t4", 10),
+				newTagJunkGenerator("t5", 10),
+			},
 		},
 		{
 			name: "nameIndex error",
@@ -88,16 +95,14 @@ func TestTagJunkGeneratorHandlerValidate(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errMsg)
-			} else {
-				require.NoError(t, err)
+				return
 			}
+			require.NoError(t, err)
 		})
 	}
 }
 
 func TestTagJunkGeneratorHandlerGenerate(t *testing.T) {
-	t.Parallel()
-
 	mockByte1 := []byte{0x01, 0x02}
 	mockByte2 := []byte{0x03, 0x04, 0x05}
 	mockGen1 := internal.NewMockByteGenerator(mockByte1)

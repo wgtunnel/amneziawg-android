@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/amnezia-vpn/amneziawg-go/conn"
+	"github.com/amnezia-vpn/amneziawg-go/device/awg"
 )
 
 type Peer struct {
@@ -137,7 +138,10 @@ func (peer *Peer) SendBuffers(buffers [][]byte) error {
 	if err == nil {
 		var totalLen uint64
 		for _, b := range buffers {
-			peer.device.awg.HandshakeHandler.PacketCounter++
+			// TODO
+			awg.PacketCounter.Inc()
+			peer.device.log.Verbosef("%v - Sending %d bytes to %s; pc: %d", peer, len(b), endpoint)
+
 			totalLen += uint64(len(b))
 		}
 		peer.txBytes.Add(totalLen)

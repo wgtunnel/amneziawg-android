@@ -22,18 +22,18 @@ func NewJunkCreator(aSecCfg aSecCfgType) (junkCreator, error) {
 }
 
 // Should be called with aSecMux RLocked
-func (jc *junkCreator) CreateJunkPackets(junks [][]byte) error {
+func (jc *junkCreator) CreateJunkPackets(junks *[][]byte) error {
 	if jc.aSecCfg.JunkPacketCount == 0 {
 		return nil
 	}
 
-	for i := range jc.aSecCfg.JunkPacketCount {
+	for range jc.aSecCfg.JunkPacketCount {
 		packetSize := jc.randomPacketSize()
 		junk, err := jc.randomJunkWithSize(packetSize)
 		if err != nil {
 			return fmt.Errorf("create junk packet: %v", err)
 		}
-		junks[i] = junk
+		*junks = append(*junks, junk)
 	}
 	return nil
 }

@@ -20,7 +20,7 @@ const (
 
 var generatorCreator = map[EnumTag]newGenerator{
 	BytesEnumTag:        newBytesGenerator,
-	CounterEnumTag:      func(s string) (Generator, error) { return &BytesGenerator{}, nil },
+	CounterEnumTag:      newPacketCounterGenerator,
 	TimestampEnumTag:    newTimestampGenerator,
 	RandomBytesEnumTag:  newRandomPacketGenerator,
 	WaitTimeoutEnumTag:  newWaitTimeoutGenerator,
@@ -88,6 +88,15 @@ func Parse(name, input string) (TagJunkGenerator, error) {
 		if err != nil {
 			return TagJunkGenerator{}, fmt.Errorf("gen: %w", err)
 		}
+
+		// TODO: handle counter tag
+		// if tag.Name == CounterEnumTag {
+		// 	packetCounter, ok := generator.(*PacketCounterGenerator)
+		// 	if !ok {
+		// 		log.Fatalf("packet counter generator expected, got %T", generator)
+		// 	}
+		// 	PacketCounter = packetCounter.counter
+		// }
 
 		rv.append(generator)
 	}

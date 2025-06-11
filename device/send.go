@@ -134,14 +134,15 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 			// set junks depending on packet type
 			junks = peer.device.awg.HandshakeHandler.GenerateSpecialJunk()
 			if junks == nil {
-				junks = peer.device.awg.HandshakeHandler.GenerateSpecialJunk()
+				peer.device.log.Verbosef("%v - No special junks defined, using controlled", peer)
+				junks = peer.device.awg.HandshakeHandler.GenerateControlledJunk()
 			}
 			peer.device.awg.ASecMux.RUnlock()
 		} else {
-			junks = make([][]byte, peer.device.awg.ASecCfg.JunkPacketCount)
+			junks = make([][]byte, 0, peer.device.awg.ASecCfg.JunkPacketCount)
 		}
 		peer.device.awg.ASecMux.RLock()
-		err := peer.device.awg.JunkCreator.CreateJunkPackets(junks)
+		err := peer.device.awg.JunkCreator.CreateJunkPackets(&junks)
 		peer.device.awg.ASecMux.RUnlock()
 
 		if err != nil {
