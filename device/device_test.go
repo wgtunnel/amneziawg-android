@@ -50,48 +50,7 @@ func uapiCfg(cfg ...string) string {
 
 // genConfigs generates a pair of configs that connect to each other.
 // The configs use distinct, probably-usable ports.
-func genConfigs(tb testing.TB) (cfgs, endpointCfgs [2]string) {
-	var key1, key2 NoisePrivateKey
-	_, err := rand.Read(key1[:])
-	if err != nil {
-		tb.Errorf("unable to generate private key random bytes: %v", err)
-	}
-	_, err = rand.Read(key2[:])
-	if err != nil {
-		tb.Errorf("unable to generate private key random bytes: %v", err)
-	}
-	pub1, pub2 := key1.publicKey(), key2.publicKey()
-
-	cfgs[0] = uapiCfg(
-		"private_key", hex.EncodeToString(key1[:]),
-		"listen_port", "0",
-		"replace_peers", "true",
-		"public_key", hex.EncodeToString(pub2[:]),
-		"protocol_version", "1",
-		"replace_allowed_ips", "true",
-		"allowed_ip", "1.0.0.2/32",
-	)
-	endpointCfgs[0] = uapiCfg(
-		"public_key", hex.EncodeToString(pub2[:]),
-		"endpoint", "127.0.0.1:%d",
-	)
-	cfgs[1] = uapiCfg(
-		"private_key", hex.EncodeToString(key2[:]),
-		"listen_port", "0",
-		"replace_peers", "true",
-		"public_key", hex.EncodeToString(pub1[:]),
-		"protocol_version", "1",
-		"replace_allowed_ips", "true",
-		"allowed_ip", "1.0.0.1/32",
-	)
-	endpointCfgs[1] = uapiCfg(
-		"public_key", hex.EncodeToString(pub1[:]),
-		"endpoint", "127.0.0.1:%d",
-	)
-	return
-}
-
-func genAWGConfigs(tb testing.TB, cfg ...string) (cfgs, endpointCfgs [2]string) {
+func genConfigs(tb testing.TB, cfg ...string) (cfgs, endpointCfgs [2]string) {
 	var key1, key2 NoisePrivateKey
 	_, err := rand.Read(key1[:])
 	if err != nil {
@@ -207,11 +166,8 @@ func genTestPair(
 	extraCfg ...string,
 ) (pair testPair) {
 	var cfg, endpointCfg [2]string
-	if len(extraCfg) > 0 {
-		cfg, endpointCfg = genAWGConfigs(tb, extraCfg...)
-	} else {
-		cfg, endpointCfg = genConfigs(tb)
-	}
+	cfg, endpointCfg = genConfigs(tb, extraCfg...)
+
 	var binds [2]conn.Bind
 	if realSocket {
 		binds[0], binds[1] = conn.NewDefaultBind(), conn.NewDefaultBind()

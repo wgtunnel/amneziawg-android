@@ -14,13 +14,13 @@ func TestNewTagJunkGenerator(t *testing.T) {
 		name     string
 		genName  string
 		size     int
-		expected TagJunkGenerator
+		expected TagJunkPacketGenerator
 	}{
 		{
 			name:    "Create new generator with empty name",
 			genName: "",
 			size:    0,
-			expected: TagJunkGenerator{
+			expected: TagJunkPacketGenerator{
 				name:       "",
 				packetSize: 0,
 				generators: make([]Generator, 0),
@@ -30,7 +30,7 @@ func TestNewTagJunkGenerator(t *testing.T) {
 			name:    "Create new generator with valid name",
 			genName: "T1",
 			size:    0,
-			expected: TagJunkGenerator{
+			expected: TagJunkPacketGenerator{
 				name:       "T1",
 				packetSize: 0,
 				generators: make([]Generator, 0),
@@ -40,7 +40,7 @@ func TestNewTagJunkGenerator(t *testing.T) {
 			name:    "Create new generator with non-zero size",
 			genName: "T2",
 			size:    5,
-			expected: TagJunkGenerator{
+			expected: TagJunkPacketGenerator{
 				name:       "T2",
 				packetSize: 0,
 				generators: make([]Generator, 5),
@@ -52,7 +52,7 @@ func TestNewTagJunkGenerator(t *testing.T) {
 		tc := tc // capture range variable
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			result := newTagJunkGenerator(tc.genName, tc.size)
+			result := newTagJunkPacketGenerator(tc.genName, tc.size)
 			require.Equal(t, tc.expected.name, result.name)
 			require.Equal(t, tc.expected.packetSize, result.packetSize)
 			require.Len(t, result.generators, len(tc.expected.generators))
@@ -65,21 +65,21 @@ func TestTagJunkGeneratorAppend(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		initialState   TagJunkGenerator
+		initialState   TagJunkPacketGenerator
 		mockSize       int
 		expectedLength int
 		expectedSize   int
 	}{
 		{
 			name:           "Append to empty generator",
-			initialState:   newTagJunkGenerator("T1", 0),
+			initialState:   newTagJunkPacketGenerator("T1", 0),
 			mockSize:       5,
 			expectedLength: 1,
 			expectedSize:   5,
 		},
 		{
 			name:           "Append to non-empty generator",
-			initialState:   TagJunkGenerator{name: "T2", packetSize: 10, generators: make([]Generator, 2)},
+			initialState:   TagJunkPacketGenerator{name: "T2", packetSize: 10, generators: make([]Generator, 2)},
 			mockSize:       7,
 			expectedLength: 3,  // 2 existing + 1 new
 			expectedSize:   17, // 10 + 7
@@ -111,20 +111,20 @@ func TestTagJunkGeneratorGenerate(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		setupGenerator func() TagJunkGenerator
+		setupGenerator func() TagJunkPacketGenerator
 		expected       []byte
 	}{
 		{
 			name: "Generate with empty generators",
-			setupGenerator: func() TagJunkGenerator {
-				return newTagJunkGenerator("T1", 0)
+			setupGenerator: func() TagJunkPacketGenerator {
+				return newTagJunkPacketGenerator("T1", 0)
 			},
 			expected: []byte{},
 		},
 		{
 			name: "Generate with single generator",
-			setupGenerator: func() TagJunkGenerator {
-				tg := newTagJunkGenerator("T2", 0)
+			setupGenerator: func() TagJunkPacketGenerator {
+				tg := newTagJunkPacketGenerator("T2", 0)
 				tg.append(mockGen1)
 				return tg
 			},
@@ -132,8 +132,8 @@ func TestTagJunkGeneratorGenerate(t *testing.T) {
 		},
 		{
 			name: "Generate with multiple generators",
-			setupGenerator: func() TagJunkGenerator {
-				tg := newTagJunkGenerator("T3", 0)
+			setupGenerator: func() TagJunkPacketGenerator {
+				tg := newTagJunkPacketGenerator("T3", 0)
 				tg.append(mockGen1)
 				tg.append(mockGen2)
 				return tg
@@ -192,7 +192,7 @@ func TestTagJunkGeneratorNameIndex(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			tg := TagJunkGenerator{name: tc.generatorName}
+			tg := TagJunkPacketGenerator{name: tc.generatorName}
 			index, err := tg.nameIndex()
 
 			if tc.expectError {

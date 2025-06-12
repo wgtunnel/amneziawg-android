@@ -190,7 +190,7 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 
 	sendBuffer = append(sendBuffer, junkedHeader)
 
-	err = peer.SendBuffersCountPacket(sendBuffer)
+	err = peer.SendAndCountBuffers(sendBuffer)
 	if err != nil {
 		peer.device.log.Errorf("%v - Failed to send handshake initiation: %v", peer, err)
 	}
@@ -246,7 +246,7 @@ func (peer *Peer) SendHandshakeResponse() error {
 	peer.timersAnyAuthenticatedPacketSent()
 
 	// TODO: allocation could be avoided
-	err = peer.SendBuffersCountPacket([][]byte{junkedHeader})
+	err = peer.SendAndCountBuffers([][]byte{junkedHeader})
 	if err != nil {
 		peer.device.log.Errorf("%v - Failed to send handshake response: %v", peer, err)
 	}
@@ -600,7 +600,7 @@ func (peer *Peer) RoutineSequentialSender(maxBatchSize int) {
 		peer.timersAnyAuthenticatedPacketTraversal()
 		peer.timersAnyAuthenticatedPacketSent()
 
-		err := peer.SendBuffersCountPacket(bufs)
+		err := peer.SendAndCountBuffers(bufs)
 		if dataSent {
 			peer.timersDataSent()
 		}

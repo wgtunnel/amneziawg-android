@@ -10,11 +10,11 @@ import (
 func TestTagJunkGeneratorHandlerAppendGenerator(t *testing.T) {
 	tests := []struct {
 		name      string
-		generator TagJunkGenerator
+		generator TagJunkPacketGenerator
 	}{
 		{
 			name:      "append single generator",
-			generator: newTagJunkGenerator("t1", 10),
+			generator: newTagJunkPacketGenerator("t1", 10),
 		},
 	}
 
@@ -22,17 +22,17 @@ func TestTagJunkGeneratorHandlerAppendGenerator(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			handler := &TagJunkGeneratorHandler{}
+			generators := &TagJunkPacketGenerators{}
 
 			// Initial length should be 0
-			require.Equal(t, 0, handler.length)
-			require.Empty(t, handler.tagGenerators)
+			require.Equal(t, 0, generators.length)
+			require.Empty(t, generators.tagGenerators)
 
 			// After append, length should be 1 and generator should be added
-			handler.AppendGenerator(tt.generator)
-			require.Equal(t, 1, handler.length)
-			require.Len(t, handler.tagGenerators, 1)
-			require.Equal(t, tt.generator, handler.tagGenerators[0])
+			generators.AppendGenerator(tt.generator)
+			require.Equal(t, 1, generators.length)
+			require.Len(t, generators.tagGenerators, 1)
+			require.Equal(t, tt.generator, generators.tagGenerators[0])
 		})
 	}
 }
@@ -40,42 +40,42 @@ func TestTagJunkGeneratorHandlerAppendGenerator(t *testing.T) {
 func TestTagJunkGeneratorHandlerValidate(t *testing.T) {
 	tests := []struct {
 		name       string
-		generators []TagJunkGenerator
+		generators []TagJunkPacketGenerator
 		wantErr    bool
 		errMsg     string
 	}{
 		{
 			name: "bad start",
-			generators: []TagJunkGenerator{
-				newTagJunkGenerator("t3", 10),
-				newTagJunkGenerator("t4", 10),
+			generators: []TagJunkPacketGenerator{
+				newTagJunkPacketGenerator("t3", 10),
+				newTagJunkPacketGenerator("t4", 10),
 			},
 			wantErr: true,
 			errMsg:  "junk packet index should be consecutive",
 		},
 		{
 			name: "non-consecutive indices",
-			generators: []TagJunkGenerator{
-				newTagJunkGenerator("t1", 10),
-				newTagJunkGenerator("t3", 10), // Missing t2
+			generators: []TagJunkPacketGenerator{
+				newTagJunkPacketGenerator("t1", 10),
+				newTagJunkPacketGenerator("t3", 10), // Missing t2
 			},
 			wantErr: true,
 			errMsg:  "junk packet index should be consecutive",
 		},
 		{
 			name: "consecutive indices",
-			generators: []TagJunkGenerator{
-				newTagJunkGenerator("t1", 10),
-				newTagJunkGenerator("t2", 10),
-				newTagJunkGenerator("t3", 10),
-				newTagJunkGenerator("t4", 10),
-				newTagJunkGenerator("t5", 10),
+			generators: []TagJunkPacketGenerator{
+				newTagJunkPacketGenerator("t1", 10),
+				newTagJunkPacketGenerator("t2", 10),
+				newTagJunkPacketGenerator("t3", 10),
+				newTagJunkPacketGenerator("t4", 10),
+				newTagJunkPacketGenerator("t5", 10),
 			},
 		},
 		{
 			name: "nameIndex error",
-			generators: []TagJunkGenerator{
-				newTagJunkGenerator("error", 10),
+			generators: []TagJunkPacketGenerator{
+				newTagJunkPacketGenerator("error", 10),
 			},
 			wantErr: true,
 			errMsg:  "name must be 2 character long",
@@ -86,12 +86,12 @@ func TestTagJunkGeneratorHandlerValidate(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			handler := &TagJunkGeneratorHandler{}
+			generators := &TagJunkPacketGenerators{}
 			for _, gen := range tt.generators {
-				handler.AppendGenerator(gen)
+				generators.AppendGenerator(gen)
 			}
 
-			err := handler.Validate()
+			err := generators.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errMsg)
@@ -110,20 +110,20 @@ func TestTagJunkGeneratorHandlerGenerate(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		setupGenerator func() []TagJunkGenerator
+		setupGenerator func() []TagJunkPacketGenerator
 		expected       [][]byte
 	}{
 		{
 			name: "generate with no default junk",
-			setupGenerator: func() []TagJunkGenerator {
-				tg1 := newTagJunkGenerator("t1", 0)
+			setupGenerator: func() []TagJunkPacketGenerator {
+				tg1 := newTagJunkPacketGenerator("t1", 0)
 				tg1.append(mockGen1)
 				tg1.append(mockGen2)
-				tg2 := newTagJunkGenerator("t2", 0)
+				tg2 := newTagJunkPacketGenerator("t2", 0)
 				tg2.append(mockGen2)
 				tg2.append(mockGen1)
 
-				return []TagJunkGenerator{tg1, tg2}
+				return []TagJunkPacketGenerator{tg1, tg2}
 			},
 			expected: [][]byte{
 				append(mockByte1, mockByte2...),
@@ -136,13 +136,13 @@ func TestTagJunkGeneratorHandlerGenerate(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			handler := &TagJunkGeneratorHandler{}
-			generators := tt.setupGenerator()
-			for _, gen := range generators {
-				handler.AppendGenerator(gen)
+			generators := &TagJunkPacketGenerators{}
+			tagGenerators := tt.setupGenerator()
+			for _, gen := range tagGenerators {
+				generators.AppendGenerator(gen)
 			}
 
-			result := handler.GeneratePackets()
+			result := generators.GeneratePackets()
 			require.Equal(t, result, tt.expected)
 		})
 	}

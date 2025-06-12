@@ -145,7 +145,7 @@ func (peer *Peer) SendBuffers(buffers [][]byte) error {
 	return err
 }
 
-func (peer *Peer) SendBuffersCountPacket(buffers [][]byte) error {
+func (peer *Peer) SendAndCountBuffers(buffers [][]byte) error {
 	err := peer.SendBuffers(buffers)
 	if err == nil {
 		awg.PacketCounter.Add(uint64(len(buffers)))

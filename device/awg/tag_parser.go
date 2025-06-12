@@ -54,10 +54,10 @@ func parseTag(input string) (Tag, error) {
 }
 
 // TODO: pointernes
-func Parse(name, input string) (TagJunkGenerator, error) {
+func Parse(name, input string) (TagJunkPacketGenerator, error) {
 	inputSlice := strings.Split(input, "<")
 	if len(inputSlice) <= 1 {
-		return TagJunkGenerator{}, fmt.Errorf("empty input: %s", input)
+		return TagJunkPacketGenerator{}, fmt.Errorf("empty input: %s", input)
 	}
 
 	uniqueTagCheck := make(map[EnumTag]bool, len(uniqueTags))
@@ -65,28 +65,28 @@ func Parse(name, input string) (TagJunkGenerator, error) {
 
 	// skip byproduct of split
 	inputSlice = inputSlice[1:]
-	rv := newTagJunkGenerator(name, len(inputSlice))
+	rv := newTagJunkPacketGenerator(name, len(inputSlice))
 	for _, inputParam := range inputSlice {
 		if len(inputParam) <= 1 {
-			return TagJunkGenerator{}, fmt.Errorf("empty tag in input: %s", inputSlice)
+			return TagJunkPacketGenerator{}, fmt.Errorf("empty tag in input: %s", inputSlice)
 		} else if strings.Count(inputParam, ">") != 1 {
-			return TagJunkGenerator{}, fmt.Errorf("ill formated input: %s", input)
+			return TagJunkPacketGenerator{}, fmt.Errorf("ill formated input: %s", input)
 		}
 
 		tag, _ := parseTag(inputParam)
 		creator, ok := generatorCreator[tag.Name]
 		if !ok {
-			return TagJunkGenerator{}, fmt.Errorf("invalid tag: %s", tag.Name)
+			return TagJunkPacketGenerator{}, fmt.Errorf("invalid tag: %s", tag.Name)
 		}
 		if present, ok := uniqueTagCheck[tag.Name]; ok {
 			if present {
-				return TagJunkGenerator{}, fmt.Errorf("tag %s needs to be unique", tag.Name)
+				return TagJunkPacketGenerator{}, fmt.Errorf("tag %s needs to be unique", tag.Name)
 			}
 			uniqueTagCheck[tag.Name] = true
 		}
 		generator, err := creator(tag.Param)
 		if err != nil {
-			return TagJunkGenerator{}, fmt.Errorf("gen: %w", err)
+			return TagJunkPacketGenerator{}, fmt.Errorf("gen: %w", err)
 		}
 
 		// TODO: handle counter tag
