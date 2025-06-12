@@ -8,7 +8,9 @@ type TagJunkPacketGenerators struct {
 	DefaultJunkCount int // Jc
 }
 
-func (generators *TagJunkPacketGenerators) AppendGenerator(generator TagJunkPacketGenerator) {
+func (generators *TagJunkPacketGenerators) AppendGenerator(
+	generator TagJunkPacketGenerator,
+) {
 	generators.tagGenerators = append(generators.tagGenerators, generator)
 	generators.length++
 }
@@ -45,11 +47,20 @@ func (generators *TagJunkPacketGenerators) GeneratePackets() [][]byte {
 	var rv = make([][]byte, 0, generators.length+generators.DefaultJunkCount)
 
 	for i, tagGenerator := range generators.tagGenerators {
-		PacketCounter.Inc()
 		rv = append(rv, make([]byte, tagGenerator.packetSize))
 		copy(rv[i], tagGenerator.generatePacket())
+		PacketCounter.Inc()
 	}
 	PacketCounter.Add(uint64(generators.DefaultJunkCount))
+
+	return rv
+}
+
+func (tg *TagJunkPacketGenerators) IpcGetFields() []IpcFields {
+	rv := make([]IpcFields, 0, len(tg.tagGenerators))
+	for _, generator := range tg.tagGenerators {
+		rv = append(rv, generator.IpcGetFields())
+	}
 
 	return rv
 }

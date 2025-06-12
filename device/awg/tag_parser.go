@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+type IpcFields struct{ Key, Value string }
+
 type EnumTag string
 
 const (
@@ -53,7 +55,6 @@ func parseTag(input string) (Tag, error) {
 	return tag, nil
 }
 
-// TODO: pointernes
 func Parse(name, input string) (TagJunkPacketGenerator, error) {
 	inputSlice := strings.Split(input, "<")
 	if len(inputSlice) <= 1 {
@@ -65,10 +66,13 @@ func Parse(name, input string) (TagJunkPacketGenerator, error) {
 
 	// skip byproduct of split
 	inputSlice = inputSlice[1:]
-	rv := newTagJunkPacketGenerator(name, len(inputSlice))
+	rv := newTagJunkPacketGenerator(name, input, len(inputSlice))
 	for _, inputParam := range inputSlice {
 		if len(inputParam) <= 1 {
-			return TagJunkPacketGenerator{}, fmt.Errorf("empty tag in input: %s", inputSlice)
+			return TagJunkPacketGenerator{}, fmt.Errorf(
+				"empty tag in input: %s",
+				inputSlice,
+			)
 		} else if strings.Count(inputParam, ">") != 1 {
 			return TagJunkPacketGenerator{}, fmt.Errorf("ill formated input: %s", input)
 		}
@@ -80,7 +84,10 @@ func Parse(name, input string) (TagJunkPacketGenerator, error) {
 		}
 		if present, ok := uniqueTagCheck[tag.Name]; ok {
 			if present {
-				return TagJunkPacketGenerator{}, fmt.Errorf("tag %s needs to be unique", tag.Name)
+				return TagJunkPacketGenerator{}, fmt.Errorf(
+					"tag %s needs to be unique",
+					tag.Name,
+				)
 			}
 			uniqueTagCheck[tag.Name] = true
 		}

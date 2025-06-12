@@ -90,7 +90,10 @@ func newRandomPacketGenerator(param string) (Generator, error) {
 		return nil, fmt.Errorf("random packet crand read: %w", err)
 	}
 
-	return &RandomPacketGenerator{cha8Rand: v2.NewChaCha8([32]byte(buf)), size: size}, nil
+	return &RandomPacketGenerator{
+		cha8Rand: v2.NewChaCha8([32]byte(buf)),
+		size:     size,
+	}, nil
 }
 
 type TimestampGenerator struct {
@@ -137,7 +140,9 @@ func newWaitTimeoutGenerator(param string) (Generator, error) {
 		return nil, fmt.Errorf("timeout must be less than 5000ms")
 	}
 
-	return &WaitTimeoutGenerator{waitTimeout: time.Duration(timeout) * time.Millisecond}, nil
+	return &WaitTimeoutGenerator{
+		waitTimeout: time.Duration(timeout) * time.Millisecond,
+	}, nil
 }
 
 type PacketCounterGenerator struct {

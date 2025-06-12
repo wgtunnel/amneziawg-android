@@ -6,13 +6,19 @@ import (
 )
 
 type TagJunkPacketGenerator struct {
-	name       string
+	name     string
+	tagValue string
+
 	packetSize int
 	generators []Generator
 }
 
-func newTagJunkPacketGenerator(name string, size int) TagJunkPacketGenerator {
-	return TagJunkPacketGenerator{name: name, generators: make([]Generator, 0, size)}
+func newTagJunkPacketGenerator(name, tagValue string, size int) TagJunkPacketGenerator {
+	return TagJunkPacketGenerator{
+		name:       name,
+		tagValue:   tagValue,
+		generators: make([]Generator, 0, size),
+	}
 }
 
 func (tg *TagJunkPacketGenerator) append(generator Generator) {
@@ -43,4 +49,11 @@ func (tg *TagJunkPacketGenerator) nameIndex() (int, error) {
 		return 0, fmt.Errorf("name 2 char should be an int %w", err)
 	}
 	return index, nil
+}
+
+func (tg *TagJunkPacketGenerator) IpcGetFields() IpcFields {
+	return IpcFields{
+		Key:   tg.name,
+		Value: tg.tagValue,
+	}
 }

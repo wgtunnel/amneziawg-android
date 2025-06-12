@@ -22,8 +22,8 @@ var WaitResponse = struct {
 
 type SpecialHandshakeHandler struct {
 	isFirstDone    bool
-	SpecialJunk    TagJunkGeneratorHandler
-	ControlledJunk TagJunkGeneratorHandler
+	SpecialJunk    TagJunkPacketGenerators
+	ControlledJunk TagJunkPacketGenerators
 
 	nextItime time.Time
 	ITimeout  time.Duration // seconds
@@ -46,14 +46,14 @@ func (handler *SpecialHandshakeHandler) GenerateSpecialJunk() [][]byte {
 	if !handler.SpecialJunk.IsDefined() {
 		return nil
 	}
+
 	// TODO: create tests
 	if !handler.isFirstDone {
 		handler.isFirstDone = true
 		handler.nextItime = time.Now().Add(handler.ITimeout)
-		return nil
-	}
 
-	if !handler.isTimeToSendSpecial() {
+		return handler.SpecialJunk.GeneratePackets()
+	} else if !handler.isTimeToSendSpecial() {
 		return nil
 	}
 

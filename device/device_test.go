@@ -7,18 +7,21 @@ package device
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"math/rand"
 	"net/netip"
 	"os"
+	"os/signal"
 	"runtime"
 	"runtime/pprof"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
+
+	"go.uber.org/atomic"
 
 	"github.com/amnezia-vpn/amneziawg-go/conn"
 	"github.com/amnezia-vpn/amneziawg-go/conn/bindtest"
@@ -242,7 +245,19 @@ func TestAWGDevicePing(t *testing.T) {
 	})
 }
 
+// Needs to be stopped with Ctrl-C
 func TestAWGHandshakeDevicePing(t *testing.T) {
+	t.Skip("This test is intended to be run manually, not as part of the test suite.")
+
+	signalContext, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+	isRunning := atomic.NewBool(true)
+	go func() {
+		<-signalContext.Done()
+		fmt.Println("Waiting to finish")
+		isRunning.Store(false)
+	}()
+
 	goroutineLeakCheck(t)
 	pair := genTestPair(t, true,
 		"i1", "<b 0xf6ab3267fa><c><b 0xf6ab><t><r 10><wt 10>",
@@ -262,13 +277,13 @@ func TestAWGHandshakeDevicePing(t *testing.T) {
 		// "h3", "123123",
 	)
 	t.Run("ping 1.0.0.1", func(t *testing.T) {
-		for {
+		for isRunning.Load() {
 			pair.Send(t, Ping, nil)
 			time.Sleep(2 * time.Second)
 		}
 	})
 	t.Run("ping 1.0.0.2", func(t *testing.T) {
-		for {
+		for isRunning.Load() {
 			pair.Send(t, Pong, nil)
 			time.Sleep(2 * time.Second)
 		}

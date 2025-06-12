@@ -78,8 +78,12 @@ func TestTagJunkGeneratorAppend(t *testing.T) {
 			expectedSize:   5,
 		},
 		{
-			name:           "Append to non-empty generator",
-			initialState:   TagJunkPacketGenerator{name: "T2", packetSize: 10, generators: make([]Generator, 2)},
+			name: "Append to non-empty generator",
+			initialState: TagJunkPacketGenerator{
+				name:       "T2",
+				packetSize: 10,
+				generators: make([]Generator, 2),
+			},
 			mockSize:       7,
 			expectedLength: 3,  // 2 existing + 1 new
 			expectedSize:   17, // 10 + 7
