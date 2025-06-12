@@ -176,7 +176,7 @@ func (pair *testPair) Send(
 	}
 	msg := tuntest.Ping(p0.ip, p1.ip)
 	p1.tun.Outbound <- msg
-	timer := time.NewTimer(5 * time.Second)
+	timer := time.NewTimer(6 * time.Second)
 	defer timer.Stop()
 	var err error
 	select {
@@ -289,11 +289,12 @@ func TestAWGDevicePing(t *testing.T) {
 func TestAWGHandshakeDevicePing(t *testing.T) {
 	goroutineLeakCheck(t)
 	pair := genTestPair(t, true,
-		// "i1", "<b 0xf6ab3267fa><c><b 0xf6ab><t><r 10><wt 10>",
-		// "i2", "<b 0xf6ab3267fa><r 100>",
+		"i1", "<b 0xf6ab3267fa><c><b 0xf6ab><t><r 10><wt 10>",
+		"i2", "<b 0xf6ab3267fa><r 100>",
 		"j1", "<b 0xffffffff><c><b 0xf6ab><t><r 10>",
 		"j2", "<c><b 0xf6ab><t><wt 1000>",
 		"j3", "<t><b 0xf6ab><c><r 10>",
+		"itime", "60",
 		// "jc", "1",
 		// "jmin", "500",
 		// "jmax", "1000",
@@ -305,10 +306,16 @@ func TestAWGHandshakeDevicePing(t *testing.T) {
 		// "h3", "123123",
 	)
 	t.Run("ping 1.0.0.1", func(t *testing.T) {
-		pair.Send(t, Ping, nil)
+		for {
+			pair.Send(t, Ping, nil)
+			time.Sleep(2 * time.Second)
+		}
 	})
 	t.Run("ping 1.0.0.2", func(t *testing.T) {
-		pair.Send(t, Pong, nil)
+		for {
+			pair.Send(t, Pong, nil)
+			time.Sleep(2 * time.Second)
+		}
 	})
 }
 

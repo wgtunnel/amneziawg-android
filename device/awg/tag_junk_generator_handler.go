@@ -43,10 +43,13 @@ func (handler *TagJunkGeneratorHandler) Validate() error {
 
 func (handler *TagJunkGeneratorHandler) GeneratePackets() [][]byte {
 	var rv = make([][]byte, 0, handler.length+handler.DefaultJunkCount)
+
 	for i, tagGenerator := range handler.tagGenerators {
+		PacketCounter.Inc()
 		rv = append(rv, make([]byte, tagGenerator.packetSize))
 		copy(rv[i], tagGenerator.generatePacket())
 	}
+	PacketCounter.Add(uint64(handler.DefaultJunkCount))
 
 	return rv
 }

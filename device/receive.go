@@ -137,10 +137,14 @@ func (device *Device) RoutineReceiveIncoming(
 			}
 
 			// check size of packet
-
 			packet := bufsArrs[i][:size]
 			var msgType uint32
 			if device.isAdvancedSecurityOn() {
+				// TODO:
+				// if awg.WaitResponse.ShouldWait.IsSet() {
+				// 	awg.WaitResponse.Channel <- struct{}{}
+				// }
+
 				if assumedMsgType, ok := packetSizeToMsgType[size]; ok {
 					junkSize := msgTypeToJunkSize[assumedMsgType]
 					// transport size can align with other header types;

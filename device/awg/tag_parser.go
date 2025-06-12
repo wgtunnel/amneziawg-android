@@ -19,12 +19,12 @@ const (
 )
 
 var generatorCreator = map[EnumTag]newGenerator{
-	BytesEnumTag:        newBytesGenerator,
-	CounterEnumTag:      newPacketCounterGenerator,
-	TimestampEnumTag:    newTimestampGenerator,
-	RandomBytesEnumTag:  newRandomPacketGenerator,
-	WaitTimeoutEnumTag:  newWaitTimeoutGenerator,
-	WaitResponseEnumTag: func(s string) (Generator, error) { return &BytesGenerator{}, nil },
+	BytesEnumTag:       newBytesGenerator,
+	CounterEnumTag:     newPacketCounterGenerator,
+	TimestampEnumTag:   newTimestampGenerator,
+	RandomBytesEnumTag: newRandomPacketGenerator,
+	WaitTimeoutEnumTag: newWaitTimeoutGenerator,
+	// WaitResponseEnumTag: newWaitResponseGenerator,
 }
 
 // helper map to determine enumTags are unique

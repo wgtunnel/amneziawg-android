@@ -4,11 +4,21 @@ import (
 	"errors"
 	"time"
 
+	"github.com/tevino/abool"
 	"go.uber.org/atomic"
 )
 
-// TODO: atomic/ and better way to use this
+// TODO: atomic?/ and better way to use this
 var PacketCounter *atomic.Uint64 = atomic.NewUint64(0)
+
+// TODO
+var WaitResponse = struct {
+	Channel    chan struct{}
+	ShouldWait *abool.AtomicBool
+}{
+	make(chan struct{}, 1),
+	abool.New(),
+}
 
 type SpecialHandshakeHandler struct {
 	isFirstDone    bool
@@ -39,7 +49,7 @@ func (handler *SpecialHandshakeHandler) GenerateSpecialJunk() [][]byte {
 	// TODO: create tests
 	if !handler.isFirstDone {
 		handler.isFirstDone = true
-		handler.nextItime = time.Now().Add(time.Duration(handler.ITimeout))
+		handler.nextItime = time.Now().Add(handler.ITimeout)
 		return nil
 	}
 
@@ -48,7 +58,7 @@ func (handler *SpecialHandshakeHandler) GenerateSpecialJunk() [][]byte {
 	}
 
 	rv := handler.SpecialJunk.GeneratePackets()
-	handler.nextItime = time.Now().Add(time.Duration(handler.ITimeout))
+	handler.nextItime = time.Now().Add(handler.ITimeout)
 
 	return rv
 }

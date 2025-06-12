@@ -394,9 +394,9 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg.Protocol)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "parse itime %w", err)
 		}
-		device.log.Verbosef("UAPI: Updating itime %s", itime)
+		device.log.Verbosef("UAPI: Updating itime %d", itime)
 
-		tempAwg.HandshakeHandler.ITimeout = time.Duration(itime)
+		tempAwg.HandshakeHandler.ITimeout = time.Duration(itime) * time.Second
 		tempAwg.HandshakeHandler.IsSet = true
 	default:
 		return ipcErrorf(ipc.IpcErrorInvalid, "invalid UAPI device key: %v", key)

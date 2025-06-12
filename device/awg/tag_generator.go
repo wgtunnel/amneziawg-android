@@ -99,7 +99,6 @@ type TimestampGenerator struct {
 func (tg *TimestampGenerator) Generate() []byte {
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix()))
-	fmt.Printf("timestamp: %v\n", buf)
 	return buf
 }
 
@@ -120,7 +119,6 @@ type WaitTimeoutGenerator struct {
 }
 
 func (wtg *WaitTimeoutGenerator) Generate() []byte {
-	fmt.Printf("sleep: %d\n", wtg.waitTimeout.Milliseconds())
 	time.Sleep(wtg.waitTimeout)
 	return []byte{}
 }
@@ -130,27 +128,25 @@ func (wtg *WaitTimeoutGenerator) Size() int {
 }
 
 func newWaitTimeoutGenerator(param string) (Generator, error) {
-	t, err := strconv.Atoi(param)
+	timeout, err := strconv.Atoi(param)
 	if err != nil {
 		return nil, fmt.Errorf("timeout parse int: %w", err)
 	}
 
-	if t > 5000 {
+	if timeout > 5000 {
 		return nil, fmt.Errorf("timeout must be less than 5000ms")
 	}
 
-	return &WaitTimeoutGenerator{waitTimeout: time.Duration(t) * time.Millisecond}, nil
+	return &WaitTimeoutGenerator{waitTimeout: time.Duration(timeout) * time.Millisecond}, nil
 }
 
 type PacketCounterGenerator struct {
-	// counter *atomic.Uint64
 }
 
 func (c *PacketCounterGenerator) Generate() []byte {
 	buf := make([]byte, 8)
 	// TODO: better way to handle counter tag
 	binary.BigEndian.PutUint64(buf, PacketCounter.Load())
-	fmt.Printf("packet %d; counter: %v\n", PacketCounter.Load(), buf)
 	return buf
 }
 
@@ -163,6 +159,27 @@ func newPacketCounterGenerator(param string) (Generator, error) {
 		return nil, fmt.Errorf("packet counter param needs to be empty: %s", param)
 	}
 
-	// return &PacketCounterGenerator{counter: atomic.NewUint64(0)}, nil
 	return &PacketCounterGenerator{}, nil
+}
+
+type WaitResponseGenerator struct {
+}
+
+func (c *WaitResponseGenerator) Generate() []byte {
+	WaitResponse.ShouldWait.Set()
+	<-WaitResponse.Channel
+	WaitResponse.ShouldWait.UnSet()
+	return []byte{}
+}
+
+func (c *WaitResponseGenerator) Size() int {
+	return 0
+}
+
+func newWaitResponseGenerator(param string) (Generator, error) {
+	if len(param) != 0 {
+		return nil, fmt.Errorf("wait response param needs to be empty: %s", param)
+	}
+
+	return &WaitResponseGenerator{}, nil
 }

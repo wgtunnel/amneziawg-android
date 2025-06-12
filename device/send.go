@@ -134,8 +134,12 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 			// set junks depending on packet type
 			junks = peer.device.awg.HandshakeHandler.GenerateSpecialJunk()
 			if junks == nil {
-				peer.device.log.Verbosef("%v - No special junks defined, using controlled", peer)
 				junks = peer.device.awg.HandshakeHandler.GenerateControlledJunk()
+				if junks != nil {
+					peer.device.log.Verbosef("%v - Controlled junks sent", peer)
+				}
+			} else {
+				peer.device.log.Verbosef("%v - Special junks sent", peer)
 			}
 			peer.device.awg.ASecMux.RUnlock()
 		} else {
@@ -186,7 +190,7 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 
 	sendBuffer = append(sendBuffer, junkedHeader)
 
-	err = peer.SendBuffers(sendBuffer)
+	err = peer.SendBuffersCountPacket(sendBuffer)
 	if err != nil {
 		peer.device.log.Errorf("%v - Failed to send handshake initiation: %v", peer, err)
 	}
@@ -242,7 +246,7 @@ func (peer *Peer) SendHandshakeResponse() error {
 	peer.timersAnyAuthenticatedPacketSent()
 
 	// TODO: allocation could be avoided
-	err = peer.SendBuffers([][]byte{junkedHeader})
+	err = peer.SendBuffersCountPacket([][]byte{junkedHeader})
 	if err != nil {
 		peer.device.log.Errorf("%v - Failed to send handshake response: %v", peer, err)
 	}
@@ -596,7 +600,7 @@ func (peer *Peer) RoutineSequentialSender(maxBatchSize int) {
 		peer.timersAnyAuthenticatedPacketTraversal()
 		peer.timersAnyAuthenticatedPacketSent()
 
-		err := peer.SendBuffers(bufs)
+		err := peer.SendBuffersCountPacket(bufs)
 		if dataSent {
 			peer.timersDataSent()
 		}

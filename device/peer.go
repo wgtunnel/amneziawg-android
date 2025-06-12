@@ -138,14 +138,20 @@ func (peer *Peer) SendBuffers(buffers [][]byte) error {
 	if err == nil {
 		var totalLen uint64
 		for _, b := range buffers {
-			// TODO
-			awg.PacketCounter.Inc()
-			peer.device.log.Verbosef("%v - Sending %d bytes to %s; pc: %d", peer, len(b), endpoint)
-
 			totalLen += uint64(len(b))
 		}
 		peer.txBytes.Add(totalLen)
 	}
+	return err
+}
+
+func (peer *Peer) SendBuffersCountPacket(buffers [][]byte) error {
+	err := peer.SendBuffers(buffers)
+	if err == nil {
+		awg.PacketCounter.Add(uint64(len(buffers)))
+		return nil
+	}
+
 	return err
 }
 
