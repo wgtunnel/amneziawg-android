@@ -139,7 +139,7 @@ func (device *Device) RoutineReceiveIncoming(
 			// check size of packet
 			packet := bufsArrs[i][:size]
 			var msgType uint32
-			if device.isAdvancedSecurityOn() {
+			if device.isAWG() {
 				// TODO:
 				// if awg.WaitResponse.ShouldWait.IsSet() {
 				// 	awg.WaitResponse.Channel <- struct{}{}

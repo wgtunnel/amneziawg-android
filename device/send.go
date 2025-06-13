@@ -212,7 +212,7 @@ func (peer *Peer) SendHandshakeResponse() error {
 		return err
 	}
 	var junkedHeader []byte
-	if peer.device.isAdvancedSecurityOn() {
+	if peer.device.isAWG() {
 		peer.device.awg.ASecMux.RLock()
 		if peer.device.awg.ASecCfg.ResponsePacketJunkSize != 0 {
 			buf := make([]byte, 0, peer.device.awg.ASecCfg.ResponsePacketJunkSize)

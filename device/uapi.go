@@ -98,7 +98,7 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 			sendf("fwmark=%d", device.net.fwmark)
 		}
 
-		if device.isAdvancedSecurityOn() {
+		if device.isAWG() {
 			if device.awg.ASecCfg.JunkPacketCount != 0 {
 				sendf("jc=%d", device.awg.ASecCfg.JunkPacketCount)
 			}
@@ -126,6 +126,7 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 			if device.awg.ASecCfg.TransportPacketMagicHeader != 0 {
 				sendf("h4=%d", device.awg.ASecCfg.TransportPacketMagicHeader)
 			}
+
 			specialJunkIpcFields := device.awg.HandshakeHandler.SpecialJunk.IpcGetFields()
 			for _, field := range specialJunkIpcFields {
 				sendf("%s=%s", field.Key, field.Value)
@@ -133,6 +134,9 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 			controlledJunkIpcFields := device.awg.HandshakeHandler.ControlledJunk.IpcGetFields()
 			for _, field := range controlledJunkIpcFields {
 				sendf("%s=%s", field.Key, field.Value)
+			}
+			if device.awg.HandshakeHandler.ITimeout != 0 {
+				sendf("itime=%d", device.awg.HandshakeHandler.ITimeout/time.Second)
 			}
 		}
 

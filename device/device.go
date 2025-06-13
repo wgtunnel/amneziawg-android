@@ -578,8 +578,8 @@ func (device *Device) BindClose() error {
 	device.net.Unlock()
 	return err
 }
-func (device *Device) isAdvancedSecurityOn() bool {
-	return device.awg.IsASecOn.IsSet()
+func (device *Device) isAWG() bool {
+	return device.version >= VersionAwg
 }
 
 func (device *Device) resetProtocol() {
