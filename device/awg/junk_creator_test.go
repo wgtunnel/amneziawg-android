@@ -34,7 +34,7 @@ func Test_junkCreator_createJunkPackets(t *testing.T) {
 		return
 	}
 	t.Run("valid", func(t *testing.T) {
-		got := make([][]byte, jc.aSecCfg.JunkPacketCount)
+		got := make([][]byte, 0, jc.aSecCfg.JunkPacketCount)
 		err := jc.CreateJunkPackets(&got)
 		if err != nil {
 			t.Errorf(

@@ -14,7 +14,7 @@ func TestTagJunkGeneratorHandlerAppendGenerator(t *testing.T) {
 	}{
 		{
 			name:      "append single generator",
-			generator: newTagJunkPacketGenerator("t1", 10),
+			generator: newTagJunkPacketGenerator("t1", "", 10),
 		},
 	}
 
@@ -47,8 +47,8 @@ func TestTagJunkGeneratorHandlerValidate(t *testing.T) {
 		{
 			name: "bad start",
 			generators: []TagJunkPacketGenerator{
-				newTagJunkPacketGenerator("t3", 10),
-				newTagJunkPacketGenerator("t4", 10),
+				newTagJunkPacketGenerator("t3", "", 10),
+				newTagJunkPacketGenerator("t4", "", 10),
 			},
 			wantErr: true,
 			errMsg:  "junk packet index should be consecutive",
@@ -56,8 +56,8 @@ func TestTagJunkGeneratorHandlerValidate(t *testing.T) {
 		{
 			name: "non-consecutive indices",
 			generators: []TagJunkPacketGenerator{
-				newTagJunkPacketGenerator("t1", 10),
-				newTagJunkPacketGenerator("t3", 10), // Missing t2
+				newTagJunkPacketGenerator("t1", "", 10),
+				newTagJunkPacketGenerator("t3", "", 10), // Missing t2
 			},
 			wantErr: true,
 			errMsg:  "junk packet index should be consecutive",
@@ -65,17 +65,17 @@ func TestTagJunkGeneratorHandlerValidate(t *testing.T) {
 		{
 			name: "consecutive indices",
 			generators: []TagJunkPacketGenerator{
-				newTagJunkPacketGenerator("t1", 10),
-				newTagJunkPacketGenerator("t2", 10),
-				newTagJunkPacketGenerator("t3", 10),
-				newTagJunkPacketGenerator("t4", 10),
-				newTagJunkPacketGenerator("t5", 10),
+				newTagJunkPacketGenerator("t1", "", 10),
+				newTagJunkPacketGenerator("t2", "", 10),
+				newTagJunkPacketGenerator("t3", "", 10),
+				newTagJunkPacketGenerator("t4", "", 10),
+				newTagJunkPacketGenerator("t5", "", 10),
 			},
 		},
 		{
 			name: "nameIndex error",
 			generators: []TagJunkPacketGenerator{
-				newTagJunkPacketGenerator("error", 10),
+				newTagJunkPacketGenerator("error", "", 10),
 			},
 			wantErr: true,
 			errMsg:  "name must be 2 character long",
@@ -116,10 +116,10 @@ func TestTagJunkGeneratorHandlerGenerate(t *testing.T) {
 		{
 			name: "generate with no default junk",
 			setupGenerator: func() []TagJunkPacketGenerator {
-				tg1 := newTagJunkPacketGenerator("t1", 0)
+				tg1 := newTagJunkPacketGenerator("t1", "", 0)
 				tg1.append(mockGen1)
 				tg1.append(mockGen2)
-				tg2 := newTagJunkPacketGenerator("t2", 0)
+				tg2 := newTagJunkPacketGenerator("t2", "", 0)
 				tg2.append(mockGen2)
 				tg2.append(mockGen1)
 
