@@ -50,9 +50,6 @@ func (handler *SpecialHandshakeHandler) GenerateSpecialJunk() [][]byte {
 	// TODO: create tests
 	if !handler.isFirstDone {
 		handler.isFirstDone = true
-		handler.nextItime = time.Now().Add(handler.ITimeout)
-
-		return handler.SpecialJunk.GeneratePackets()
 	} else if !handler.isTimeToSendSpecial() {
 		return nil
 	}

@@ -378,7 +378,8 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg.Protocol)
 		tempAwg.ASecCfg.IsSet = true
 	case "i1", "i2", "i3", "i4", "i5":
 		if len(value) == 0 {
-			return ipcErrorf(ipc.IpcErrorInvalid, "%s should be non null", key)
+			device.log.Verbosef("UAPI: received empty %s", key)
+			return nil
 		}
 
 		generators, err := awg.Parse(key, value)
@@ -390,7 +391,8 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg.Protocol)
 		tempAwg.HandshakeHandler.IsSet = true
 	case "j1", "j2", "j3":
 		if len(value) == 0 {
-			return ipcErrorf(ipc.IpcErrorInvalid, "%s should be non null", key)
+			device.log.Verbosef("UAPI: received empty %s", key)
+			return nil
 		}
 
 		generators, err := awg.Parse(key, value)
