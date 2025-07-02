@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  *
- * Copyright (C) 2017-2025 WireGuard LLC. All Rights Reserved.
+ * Copyright (C) 2017-2023 WireGuard LLC. All Rights Reserved.
  */
 
 package device
@@ -92,9 +92,9 @@ type Device struct {
 	closed   chan struct{}
 	log      *Logger
 
-	isASecOn    abool.AtomicBool
-	aSecMux     sync.RWMutex
-	aSecCfg     aSecCfgType
+	isASecOn abool.AtomicBool
+	aSecMux  sync.RWMutex
+	aSecCfg  aSecCfgType
 	junkCreator junkCreator
 }
 
