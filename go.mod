@@ -6,12 +6,11 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/tevino/abool v1.2.0
 	github.com/tevino/abool/v2 v2.1.0
-	go.uber.org/atomic v1.11.0
-	golang.org/x/crypto v0.39.0
-	golang.org/x/net v0.41.0
-	golang.org/x/sys v0.33.0
+	golang.org/x/crypto v0.36.0
+	golang.org/x/net v0.37.0
+	golang.org/x/sys v0.31.0
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2
-	gvisor.dev/gvisor v0.0.0-20231202080848-1f7806d17489
+	gvisor.dev/gvisor v0.0.0-20250130013005-04f9204697c6
 )
 
 require (
