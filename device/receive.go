@@ -157,12 +157,15 @@ func (device *Device) RoutineReceiveIncoming(
 						msgType = binary.LittleEndian.Uint32(packet[:4])
 					}
 				} else {
-					msgType = binary.LittleEndian.Uint32(packet[:4])
+					transportJunkSize := device.awg.ASecCfg.TransportHeaderJunkSize
+					msgType = binary.LittleEndian.Uint32(packet[transportJunkSize : transportJunkSize+4])
 					if msgType != MessageTransportType {
 						// probably a junk packet
 						device.log.Verbosef("aSec: Received message with unknown type: %d", msgType)
 						continue
 					}
+
+					packet = packet[transportJunkSize:]
 				}
 			} else {
 				msgType = binary.LittleEndian.Uint32(packet[:4])

@@ -124,9 +124,9 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 		return err
 	}
 	var sendBuffer [][]byte
+
 	// so only packet processed for cookie generation
 	var junkedHeader []byte
-
 	if peer.device.version >= VersionAwg {
 		var junks [][]byte
 		if peer.device.version == VersionAwgSpecialHandshake {
@@ -163,19 +163,11 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 			}
 		}
 
-		peer.device.awg.ASecMux.RLock()
-		if peer.device.awg.ASecCfg.InitPacketJunkSize != 0 {
-			buf := make([]byte, 0, peer.device.awg.ASecCfg.InitPacketJunkSize)
-			writer := bytes.NewBuffer(buf[:0])
-			err = peer.device.awg.JunkCreator.AppendJunk(writer, peer.device.awg.ASecCfg.InitPacketJunkSize)
-			if err != nil {
-				peer.device.log.Errorf("%v - %v", peer, err)
-				peer.device.awg.ASecMux.RUnlock()
-				return err
-			}
-			junkedHeader = writer.Bytes()
+		junkedHeader, err = peer.device.awg.CreateInitHeaderJunk()
+		if err != nil {
+			peer.device.log.Errorf("%v - %v", peer, err)
+			return err
 		}
-		peer.device.awg.ASecMux.RUnlock()
 	}
 
 	var buf [MessageInitiationSize]byte
@@ -211,22 +203,13 @@ func (peer *Peer) SendHandshakeResponse() error {
 		peer.device.log.Errorf("%v - Failed to create response message: %v", peer, err)
 		return err
 	}
-	var junkedHeader []byte
-	if peer.device.isAWG() {
-		peer.device.awg.ASecMux.RLock()
-		if peer.device.awg.ASecCfg.ResponsePacketJunkSize != 0 {
-			buf := make([]byte, 0, peer.device.awg.ASecCfg.ResponsePacketJunkSize)
-			writer := bytes.NewBuffer(buf[:0])
-			err = peer.device.awg.JunkCreator.AppendJunk(writer, peer.device.awg.ASecCfg.ResponsePacketJunkSize)
-			if err != nil {
-				peer.device.awg.ASecMux.RUnlock()
-				peer.device.log.Errorf("%v - %v", peer, err)
-				return err
-			}
-			junkedHeader = writer.Bytes()
-		}
-		peer.device.awg.ASecMux.RUnlock()
+
+	junkedHeader, err := peer.device.awg.CreateResponseHeaderJunk()
+	if err != nil {
+		peer.device.log.Errorf("%v - %v", peer, err)
+		return err
 	}
+
 	var buf [MessageResponseSize]byte
 	writer := bytes.NewBuffer(buf[:0])
 
@@ -269,11 +252,19 @@ func (device *Device) SendHandshakeCookie(
 		return err
 	}
 
+	junkedHeader, err := device.awg.CreateCookieReplyHeaderJunk()
+	if err != nil {
+		device.log.Errorf("%v - %v", device, err)
+		return err
+	}
+
 	var buf [MessageCookieReplySize]byte
 	writer := bytes.NewBuffer(buf[:0])
 	binary.Write(writer, binary.LittleEndian, reply)
+
+	junkedHeader = append(junkedHeader, writer.Bytes()...)
 	// TODO: allocation could be avoided
-	device.net.bind.Send([][]byte{writer.Bytes()}, initiatingElem.endpoint)
+	device.net.bind.Send([][]byte{junkedHeader}, initiatingElem.endpoint)
 	return nil
 }
 
@@ -593,6 +584,13 @@ func (peer *Peer) RoutineSequentialSender(maxBatchSize int) {
 		for _, elem := range elemsContainer.elems {
 			if len(elem.packet) != MessageKeepaliveSize {
 				dataSent = true
+				junkedHeader, err := device.awg.CreateTransportHeaderJunk()
+				if err != nil {
+					device.log.Errorf("%v - %v", device, err)
+					continue
+				}
+
+				elem.packet = append(junkedHeader, elem.packet...)
 			}
 			bufs = append(bufs, elem.packet)
 		}
@@ -604,6 +602,7 @@ func (peer *Peer) RoutineSequentialSender(maxBatchSize int) {
 		if dataSent {
 			peer.timersDataSent()
 		}
+
 		for _, elem := range elemsContainer.elems {
 			device.PutMessageBuffer(elem.buffer)
 			device.PutOutboundElement(elem)

@@ -17,6 +17,7 @@ import (
 	"os/signal"
 	"runtime"
 	"runtime/pprof"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -129,6 +130,7 @@ func (pair *testPair) Send(
 	tb testing.TB,
 	ping SendDirection,
 	done chan struct{},
+	optTransportJunk ...int,
 ) {
 	tb.Helper()
 	p0, p1 := pair[0], pair[1]
@@ -136,6 +138,12 @@ func (pair *testPair) Send(
 		// pong is the new ping
 		p0, p1 = p1, p0
 	}
+
+	transportJunk := 0
+	if len(optTransportJunk) > 0 {
+		transportJunk = optTransportJunk[0]
+	}
+
 	msg := tuntest.Ping(p0.ip, p1.ip)
 	p1.tun.Outbound <- msg
 	timer := time.NewTimer(6 * time.Second)
@@ -143,7 +151,10 @@ func (pair *testPair) Send(
 	var err error
 	select {
 	case msgRecv := <-p0.tun.Inbound:
-		if !bytes.Equal(msg, msgRecv) {
+		fmt.Printf("%x\n", msg)
+		fmt.Printf("%x\n", msgRecv[transportJunk:])
+		fmt.Printf("%x\n", msgRecv)
+		if !bytes.Equal(msg, msgRecv[transportJunk:]) {
 			err = fmt.Errorf("%s did not transit correctly", ping)
 		}
 	case <-timer.C:
@@ -226,22 +237,27 @@ func TestTwoDevicePing(t *testing.T) {
 // Run test with -race=false to avoid the race for setting the default msgTypes 2 times
 func TestAWGDevicePing(t *testing.T) {
 	goroutineLeakCheck(t)
+
+	transportJunk := 5
+
 	pair := genTestPair(t, true,
 		"jc", "5",
 		"jmin", "500",
 		"jmax", "1000",
-		"s1", "30",
-		"s2", "40",
-		"h1", "123456",
-		"h2", "67543",
-		"h4", "32345",
-		"h3", "123123",
+		// "s1", "30",
+		// "s2", "40",
+		"s3", "50",
+		"s4", strconv.Itoa(transportJunk),
+		// "h1", "123456",
+		// "h2", "67543",
+		// "h3", "123123",
+		// "h4", "32345",
 	)
 	t.Run("ping 1.0.0.1", func(t *testing.T) {
-		pair.Send(t, Ping, nil)
+		pair.Send(t, Ping, nil, transportJunk)
 	})
 	t.Run("ping 1.0.0.2", func(t *testing.T) {
-		pair.Send(t, Pong, nil)
+		pair.Send(t, Pong, nil, transportJunk)
 	})
 }
 

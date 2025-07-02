@@ -114,6 +114,16 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	return peer, nil
 }
 
+func (peer *Peer) SendAndCountBuffers(buffers [][]byte) error {
+	err := peer.SendBuffers(buffers)
+	if err == nil {
+		awg.PacketCounter.Add(uint64(len(buffers)))
+		return nil
+	}
+
+	return err
+}
+
 func (peer *Peer) SendBuffers(buffers [][]byte) error {
 	peer.device.net.RLock()
 	defer peer.device.net.RUnlock()
@@ -142,16 +152,6 @@ func (peer *Peer) SendBuffers(buffers [][]byte) error {
 		}
 		peer.txBytes.Add(totalLen)
 	}
-	return err
-}
-
-func (peer *Peer) SendAndCountBuffers(buffers [][]byte) error {
-	err := peer.SendBuffers(buffers)
-	if err == nil {
-		awg.PacketCounter.Add(uint64(len(buffers)))
-		return nil
-	}
-
 	return err
 }
 

@@ -12,6 +12,7 @@ type junkCreator struct {
 	cha8Rand *v2.ChaCha8
 }
 
+// TODO: refactor param to only pass the junk related params
 func NewJunkCreator(aSecCfg aSecCfgType) (junkCreator, error) {
 	buf := make([]byte, 32)
 	_, err := crand.Read(buf)

@@ -82,9 +82,10 @@ const (
 	MessageTransportOffsetContent  = 16
 )
 
-var packetSizeToMsgType map[int]uint32
-
-var msgTypeToJunkSize map[uint32]int
+var (
+	packetSizeToMsgType map[int]uint32
+	msgTypeToJunkSize   map[uint32]int
+)
 
 /* Type is an 8-bit field, followed by 3 nul bytes,
  * by marshalling the messages in little-endian byteorder
