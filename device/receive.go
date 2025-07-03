@@ -165,11 +165,17 @@ func (device *Device) RoutineReceiveIncoming(
 						continue
 					}
 
-					packet = packet[transportJunkSize:]
+					// remove junk from bufsArrs by shifting the packet
+					// this buffer is also used for decryption, so it needs to be corrected
+					copy(bufsArrs[i][:size], packet[transportJunkSize:])
+					size -= transportJunkSize
+					// need to reinitialize packet as well
+					packet = packet[:size]
 				}
 			} else {
 				msgType = binary.LittleEndian.Uint32(packet[:4])
 			}
+
 			switch msgType {
 
 			// check if transport

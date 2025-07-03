@@ -584,6 +584,7 @@ func (peer *Peer) RoutineSequentialSender(maxBatchSize int) {
 		for _, elem := range elemsContainer.elems {
 			if len(elem.packet) != MessageKeepaliveSize {
 				dataSent = true
+
 				junkedHeader, err := device.awg.CreateTransportHeaderJunk()
 				if err != nil {
 					device.log.Errorf("%v - %v", device, err)
