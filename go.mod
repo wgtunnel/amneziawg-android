@@ -5,7 +5,7 @@ go 1.24.4
 require (
 	github.com/stretchr/testify v1.10.0
 	github.com/tevino/abool v1.2.0
-	github.com/tevino/abool/v2 v2.1.0
+	go.uber.org/atomic v1.11.0
 	golang.org/x/crypto v0.36.0
 	golang.org/x/net v0.37.0
 	golang.org/x/sys v0.31.0

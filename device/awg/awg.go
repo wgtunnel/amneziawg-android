@@ -12,22 +12,23 @@ import (
 )
 
 type aSecCfgType struct {
-	IsSet                      bool
-	JunkPacketCount            int
-	JunkPacketMinSize          int
-	JunkPacketMaxSize          int
-	InitHeaderJunkSize         int
-	ResponseHeaderJunkSize     int
-	CookieReplyHeaderJunkSize  int
-	TransportHeaderJunkSize    int
-	InitPacketMagicHeader      uint32
-	ResponsePacketMagicHeader  uint32
-	UnderloadPacketMagicHeader uint32
-	TransportPacketMagicHeader uint32
-	// InitPacketMagicHeader      Limit
-	// ResponsePacketMagicHeader  Limit
-	// UnderloadPacketMagicHeader Limit
-	// TransportPacketMagicHeader Limit
+	IsSet                     bool
+	JunkPacketCount           int
+	JunkPacketMinSize         int
+	JunkPacketMaxSize         int
+	InitHeaderJunkSize        int
+	ResponseHeaderJunkSize    int
+	CookieReplyHeaderJunkSize int
+	TransportHeaderJunkSize   int
+	// InitPacketMagicHeader      uint32
+	// ResponsePacketMagicHeader  uint32
+	// UnderloadPacketMagicHeader uint32
+	// TransportPacketMagicHeader uint32
+
+	InitPacketMagicHeader      Limit
+	ResponsePacketMagicHeader  Limit
+	UnderloadPacketMagicHeader Limit
+	TransportPacketMagicHeader Limit
 }
 
 type Limit struct {
@@ -49,31 +50,29 @@ func NewLimit(min, max, headerType uint32) (Limit, error) {
 }
 
 func ParseMagicHeader(key, value string, defaultHeaderType uint32) (Limit, error) {
-	// tempAwg.ASecCfg.InitPacketMagicHeader, err = awg.NewLimit(uint32(initPacketMagicHeaderMin), uint32(initPacketMagicHeaderMax), DNewLimit(min, max, headerType)efaultMessageInitiationType)
-	// var min, max, headerType uint32
-	// _, err := fmt.Sscanf(value, "%d-%d:%d", &min, &max, &headerType)
-	// if err != nil {
-	// 	return Limit{}, fmt.Errorf("invalid magic header format: %s", value)
-	// }
+	splitLimits := strings.Split(value, "-")
+	if len(splitLimits) != 2 {
+		magicHeader, err := strconv.ParseUint(value, 10, 32)
+		if err != nil {
+			return Limit{}, fmt.Errorf("parse key: %s; value: %s; %w", key, value, err)
+		}
 
-	limits := strings.Split(value, "-")
-	if len(limits) != 2 {
-		return Limit{}, fmt.Errorf("invalid format for key: %s; %s", key, value)
+		return NewLimit(uint32(magicHeader), uint32(magicHeader), defaultHeaderType)
 	}
 
-	min, err := strconv.ParseUint(limits[0], 10, 32)
+	min, err := strconv.ParseUint(splitLimits[0], 10, 32)
 	if err != nil {
-		return Limit{}, fmt.Errorf("parse min key: %s; value: ; %w", key, limits[0], err)
+		return Limit{}, fmt.Errorf("parse min key: %s; value: %s; %w", key, splitLimits[0], err)
 	}
 
-	max, err := strconv.ParseUint(limits[1], 10, 32)
+	max, err := strconv.ParseUint(splitLimits[1], 10, 32)
 	if err != nil {
-		return Limit{}, fmt.Errorf("parse max key: %s; value: ; %w", key, limits[0], err)
+		return Limit{}, fmt.Errorf("parse max key: %s; value: %s; %w", key, splitLimits[1], err)
 	}
 
 	limit, err := NewLimit(uint32(min), uint32(max), defaultHeaderType)
 	if err != nil {
-		return Limit{}, fmt.Errorf("new lmit key: %s; value: ; %w", key, limits[0], err)
+		return Limit{}, fmt.Errorf("new limit key: %s; value: %s-%s; %w", key, splitLimits[0], splitLimits[1], err)
 	}
 
 	return limit, nil
@@ -81,7 +80,7 @@ func ParseMagicHeader(key, value string, defaultHeaderType uint32) (Limit, error
 
 type Limits []Limit
 
-func NewLimits(limits []Limit) Limits {
+func NewLimits(limits ...Limit) Limits {
 	slices.SortFunc(limits, func(a, b Limit) int {
 		if a.Min < b.Min {
 			return -1
@@ -102,32 +101,30 @@ type Protocol struct {
 	JunkCreator junkCreator
 
 	HandshakeHandler SpecialHandshakeHandler
+
+	limits Limits
 }
 
 func (protocol *Protocol) CreateInitHeaderJunk() ([]byte, error) {
-	return protocol.createHeaderJunk(protocol.ASecCfg.InitHeaderJunkSize)
+	return protocol.createHeaderJunk(protocol.ASecCfg.InitHeaderJunkSize, 0)
 }
 
 func (protocol *Protocol) CreateResponseHeaderJunk() ([]byte, error) {
-	return protocol.createHeaderJunk(protocol.ASecCfg.ResponseHeaderJunkSize)
+	return protocol.createHeaderJunk(protocol.ASecCfg.ResponseHeaderJunkSize, 0)
 }
 
 func (protocol *Protocol) CreateCookieReplyHeaderJunk() ([]byte, error) {
-	return protocol.createHeaderJunk(protocol.ASecCfg.CookieReplyHeaderJunkSize)
+	return protocol.createHeaderJunk(protocol.ASecCfg.CookieReplyHeaderJunkSize, 0)
 }
 
 func (protocol *Protocol) CreateTransportHeaderJunk(packetSize int) ([]byte, error) {
 	return protocol.createHeaderJunk(protocol.ASecCfg.TransportHeaderJunkSize, packetSize)
 }
 
-func (protocol *Protocol) createHeaderJunk(junkSize int, optExtraSize ...int) ([]byte, error) {
-	extraSize := 0
-	if len(optExtraSize) == 1 {
-		extraSize = optExtraSize[0]
-	}
-
+func (protocol *Protocol) createHeaderJunk(junkSize int, extraSize int) ([]byte, error) {
 	var junk []byte
 	protocol.ASecMux.RLock()
+
 	if junkSize != 0 {
 		buf := make([]byte, 0, junkSize+extraSize)
 		writer := bytes.NewBuffer(buf[:0])
@@ -141,4 +138,14 @@ func (protocol *Protocol) createHeaderJunk(junkSize int, optExtraSize ...int) ([
 	protocol.ASecMux.RUnlock()
 
 	return junk, nil
+}
+
+func (protocol *Protocol) GetLimitMin(msgType uint32) (uint32, error) {
+	for _, limit := range protocol.limits {
+		if limit.Min <= msgType && msgType <= limit.Max {
+			return limit.Min, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no limit found for message type: %d", msgType)
 }

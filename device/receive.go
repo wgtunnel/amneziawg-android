@@ -140,37 +140,10 @@ func (device *Device) RoutineReceiveIncoming(
 			packet := bufsArrs[i][:size]
 			var msgType uint32
 			if device.isAWG() {
-				// TODO:
-				// if awg.WaitResponse.ShouldWait.IsSet() {
-				// 	awg.WaitResponse.Channel <- struct{}{}
-				// }
-
-				if assumedMsgType, ok := packetSizeToMsgType[size]; ok {
-					junkSize := msgTypeToJunkSize[assumedMsgType]
-					// transport size can align with other header types;
-					// making sure we have the right msgType
-					msgType = binary.LittleEndian.Uint32(packet[junkSize : junkSize+4])
-					if msgType == assumedMsgType {
-						packet = packet[junkSize:]
-					} else {
-						device.log.Verbosef("transport packet lined up with another msg type")
-						msgType = binary.LittleEndian.Uint32(packet[:4])
-					}
-				} else {
-					transportJunkSize := device.awg.ASecCfg.TransportHeaderJunkSize
-					msgType = binary.LittleEndian.Uint32(packet[transportJunkSize : transportJunkSize+4])
-					if msgType != MessageTransportType {
-						// probably a junk packet
-						device.log.Verbosef("aSec: Received message with unknown type: %d", msgType)
-						continue
-					}
-
-					// remove junk from bufsArrs by shifting the packet
-					// this buffer is also used for decryption, so it needs to be corrected
-					copy(bufsArrs[i][:size], packet[transportJunkSize:])
-					size -= transportJunkSize
-					// need to reinitialize packet as well
-					packet = packet[:size]
+				msgType, err = device.Logic(size, &packet, bufsArrs[i])
+				if err != nil {
+					device.log.Verbosef("awg device logic: %w", err)
+					continue
 				}
 			} else {
 				msgType = binary.LittleEndian.Uint32(packet[:4])

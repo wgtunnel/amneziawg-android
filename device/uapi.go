@@ -370,11 +370,8 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg.Protocol)
 		tempAwg.ASecCfg.IsSet = true
 
 	case "h1":
-		initPacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
-		if err != nil {
-			return ipcErrorf(ipc.IpcErrorInvalid, "parse init_packet_magic_header %w", err)
-		}
-		tempAwg.ASecCfg.InitPacketMagicHeader = uint32(initPacketMagicHeader)
+		awg.ParseMagicHeader(key, value, &tempAwg.ASecCfg.InitPacketMagicHeader)
+
 		tempAwg.ASecCfg.IsSet = true
 
 	case "h2":
