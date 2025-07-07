@@ -428,6 +428,11 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg.Protocol)
 		tempAwg.HandshakeHandler.ControlledJunk.AppendGenerator(generators)
 		tempAwg.HandshakeHandler.IsSet = true
 	case "itime":
+		if len(value) == 0 {
+			device.log.Verbosef("UAPI: received empty itime")
+			return nil
+		}
+
 		itime, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "parse itime %w", err)

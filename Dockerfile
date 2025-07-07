@@ -6,7 +6,9 @@ RUN go mod download && \
     go build -ldflags '-linkmode external -extldflags "-fno-PIC -static"' -v -o /usr/bin
 
 FROM alpine:3.19
-ARG AWGTOOLS_RELEASE="1.0.20250704"
+# ARG AWGTOOLS_RELEASE="1.0.20250704"
+ARG AWGTOOLS_RELEASE="1.0.20241018"
+
 RUN apk --no-cache add iproute2 iptables bash && \
     cd /usr/bin/ && \
     wget https://github.com/amnezia-vpn/amneziawg-tools/releases/download/v${AWGTOOLS_RELEASE}/alpine-3.19-amneziawg-tools.zip && \

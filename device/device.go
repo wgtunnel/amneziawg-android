@@ -692,6 +692,7 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 			MaxSegmentSize,
 		),
 		)
+<<<<<<< HEAD
 	} else {
 		device.awg.ASecCfg.CookieReplyHeaderJunkSize = tempAwg.ASecCfg.CookieReplyHeaderJunkSize
 	}
@@ -725,30 +726,31 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 		newTransportSize: {},
 	}
 
-	if len(isSameSizeMap) != 4 {
+=======
+	} else {
+		device.awg.ASecCfg.CookieReplyHeaderJunkSize = tempAwg.ASecCfg.CookieReplyHeaderJunkSize
+	}
+
+	if tempAwg.ASecCfg.CookieReplyHeaderJunkSize != 0 {
+		isASecOn = true
+	}
+
+	newTransportSize := MessageTransportSize + tempAwg.ASecCfg.TransportHeaderJunkSize
+
+	if newTransportSize >= MaxSegmentSize {
 		errs = append(errs, ipcErrorf(
 			ipc.IpcErrorInvalid,
-			`new sizes should differ; init: %d; response: %d; cookie: %d; trans: %d`,
-			newInitSize,
-			newResponseSize,
-			newCookieSize,
-			newTransportSize,
+			`transport size(92) + junkSize:%d; should be smaller than maxSegmentSize: %d`,
+			tempAwg.ASecCfg.TransportHeaderJunkSize,
+			MaxSegmentSize,
 		),
 		)
 	} else {
-		packetSizeToMsgType = map[int]uint32{
-			newInitSize:      MessageInitiationType,
-			newResponseSize:  MessageResponseType,
-			newCookieSize:    MessageCookieReplyType,
-			newTransportSize: MessageTransportType,
-		}
+		device.awg.ASecCfg.TransportHeaderJunkSize = tempAwg.ASecCfg.TransportHeaderJunkSize
+	}
 
-		msgTypeToJunkSize = map[uint32]int{
-			MessageInitiationType:  device.awg.ASecCfg.InitHeaderJunkSize,
-			MessageResponseType:    device.awg.ASecCfg.ResponseHeaderJunkSize,
-			MessageCookieReplyType: device.awg.ASecCfg.CookieReplyHeaderJunkSize,
-			MessageTransportType:   device.awg.ASecCfg.TransportHeaderJunkSize,
-		}
+	if tempAwg.ASecCfg.TransportHeaderJunkSize != 0 {
+		isASecOn = true
 	}
 
 	if tempAwg.ASecCfg.InitPacketMagicHeader > 4 {
@@ -809,6 +811,39 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 			MessageTransportType,
 		),
 		)
+	}
+
+	isSameSizeMap := map[int]struct{}{
+		newInitSize:      {},
+		newResponseSize:  {},
+		newCookieSize:    {},
+		newTransportSize: {},
+	}
+
+	if len(isSameSizeMap) != 4 {
+		errs = append(errs, ipcErrorf(
+			ipc.IpcErrorInvalid,
+			`new sizes should differ; init: %d; response: %d; cookie: %d; trans: %d`,
+			newInitSize,
+			newResponseSize,
+			newCookieSize,
+			newTransportSize,
+		),
+		)
+	} else {
+		msgTypeToJunkSize = map[uint32]int{
+			MessageInitiationType:  device.awg.ASecCfg.InitHeaderJunkSize,
+			MessageResponseType:    device.awg.ASecCfg.ResponseHeaderJunkSize,
+			MessageCookieReplyType: device.awg.ASecCfg.CookieReplyHeaderJunkSize,
+			MessageTransportType:   device.awg.ASecCfg.TransportHeaderJunkSize,
+		}
+
+		packetSizeToMsgType = map[int]uint32{
+			newInitSize:      MessageInitiationType,
+			newResponseSize:  MessageResponseType,
+			newCookieSize:    MessageCookieReplyType,
+			newTransportSize: MessageTransportType,
+		}
 	}
 
 	device.awg.IsASecOn.SetTo(isASecOn)
