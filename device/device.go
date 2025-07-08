@@ -648,24 +648,29 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 		isASecOn = true
 	}
 
+	limits := make([]awg.Limit, 4)
+
 	if tempAwg.ASecCfg.InitPacketMagicHeader.Min > 4 {
 		isASecOn = true
 		device.log.Verbosef("UAPI: Updating init_packet_magic_header")
 		device.awg.ASecCfg.InitPacketMagicHeader = tempAwg.ASecCfg.InitPacketMagicHeader
+		limits[0] = tempAwg.ASecCfg.InitPacketMagicHeader
 		MessageInitiationType = device.awg.ASecCfg.InitPacketMagicHeader.Min
 	} else {
 		device.log.Verbosef("UAPI: Using default init type")
 		MessageInitiationType = DefaultMessageInitiationType
+		limits[0] = awg.NewLimitSameValue(DefaultMessageInitiationType)
 	}
 
 	if tempAwg.ASecCfg.ResponsePacketMagicHeader.Min > 4 {
 		isASecOn = true
 		device.log.Verbosef("UAPI: Updating response_packet_magic_header")
-		device.awg.ASecCfg.ResponsePacketMagicHeader = tempAwg.ASecCfg.ResponsePacketMagicHeader
 		MessageResponseType = device.awg.ASecCfg.ResponsePacketMagicHeader.Min
+		limits[1] = tempAwg.ASecCfg.ResponsePacketMagicHeader
 	} else {
 		device.log.Verbosef("UAPI: Using default response type")
 		MessageResponseType = DefaultMessageResponseType
+		limits[1] = awg.NewLimitSameValue(DefaultMessageResponseType)
 	}
 
 	if tempAwg.ASecCfg.UnderloadPacketMagicHeader.Min > 4 {
@@ -673,9 +678,11 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 		device.log.Verbosef("UAPI: Updating underload_packet_magic_header")
 		device.awg.ASecCfg.UnderloadPacketMagicHeader = tempAwg.ASecCfg.UnderloadPacketMagicHeader
 		MessageCookieReplyType = device.awg.ASecCfg.UnderloadPacketMagicHeader.Min
+		limits[2] = tempAwg.ASecCfg.UnderloadPacketMagicHeader
 	} else {
 		device.log.Verbosef("UAPI: Using default underload type")
 		MessageCookieReplyType = DefaultMessageCookieReplyType
+		limits[2] = awg.NewLimitSameValue(DefaultMessageCookieReplyType)
 	}
 
 	if tempAwg.ASecCfg.TransportPacketMagicHeader.Min > 4 {
@@ -683,9 +690,11 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 		device.log.Verbosef("UAPI: Updating transport_packet_magic_header")
 		device.awg.ASecCfg.TransportPacketMagicHeader = tempAwg.ASecCfg.TransportPacketMagicHeader
 		MessageTransportType = device.awg.ASecCfg.TransportPacketMagicHeader.Min
+		limits[3] = tempAwg.ASecCfg.UnderloadPacketMagicHeader
 	} else {
 		device.log.Verbosef("UAPI: Using default transport type")
 		MessageTransportType = DefaultMessageTransportType
+		limits[3] = awg.NewLimitSameValue(DefaultMessageTransportType)
 	}
 
 	isSameHeaderMap := map[uint32]struct{}{
@@ -707,6 +716,8 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 		),
 		)
 	}
+
+	device.awg.MagicHeaders = awg.NewLimits(limits)
 
 	newInitSize := MessageInitiationSize + tempAwg.ASecCfg.InitHeaderJunkSize
 
@@ -814,11 +825,7 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 	}
 
 	device.awg.IsASecOn.SetTo(isASecOn)
-	var err error
-	device.awg.JunkCreator, err = awg.NewJunkCreator(device.awg.ASecCfg)
-	if err != nil {
-		errs = append(errs, err)
-	}
+	device.awg.JunkCreator = awg.NewJunkCreator(device.awg.ASecCfg)
 
 	if tempAwg.HandshakeHandler.IsSet {
 		if err := tempAwg.HandshakeHandler.Validate(); err != nil {

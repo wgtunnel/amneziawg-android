@@ -146,7 +146,7 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 			junks = make([][]byte, 0, peer.device.awg.ASecCfg.JunkPacketCount)
 		}
 		peer.device.awg.ASecMux.RLock()
-		err := peer.device.awg.JunkCreator.CreateJunkPackets(&junks)
+		peer.device.awg.JunkCreator.CreateJunkPackets(&junks)
 		peer.device.awg.ASecMux.RUnlock()
 
 		if err != nil {
@@ -242,10 +242,17 @@ func (device *Device) SendHandshakeCookie(
 	device.log.Verbosef("Sending cookie response for denied handshake message for %v", initiatingElem.endpoint.DstToString())
 
 	sender := binary.LittleEndian.Uint32(initiatingElem.packet[4:8])
+	msgType, err := device.awg.Get(DefaultMessageCookieReplyType)
+	if err != nil {
+		device.log.Errorf("Get message type for cookie reply: %v", err)
+		return err
+	}
+
 	reply, err := device.cookieChecker.CreateReply(
 		initiatingElem.packet,
 		sender,
 		initiatingElem.endpoint.DstToBytes(),
+		msgType,
 	)
 	if err != nil {
 		device.log.Errorf("Failed to create cookie reply: %v", err)
@@ -528,7 +535,12 @@ func (device *Device) RoutineEncryption(id int) {
 			fieldReceiver := header[4:8]
 			fieldNonce := header[8:16]
 
-			binary.LittleEndian.PutUint32(fieldType, MessageTransportType)
+			msgType, err := device.awg.Get(DefaultMessageTransportType)
+			if err != nil {
+				device.log.Errorf("Get message type for transport: %v", err)
+				continue
+			}
+			binary.LittleEndian.PutUint32(fieldType, msgType)
 			binary.LittleEndian.PutUint32(fieldReceiver, elem.keypair.remoteIndex)
 			binary.LittleEndian.PutUint64(fieldNonce, elem.nonce)
 

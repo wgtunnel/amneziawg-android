@@ -21,7 +21,7 @@ func NewPRNG[T constraints.Integer]() PRNG[T] {
 }
 
 func (p PRNG[T]) RandomSizeInRange(min, max T) T {
-	if min >= max {
+	if min > max {
 		panic("min must be less than max")
 	}
 

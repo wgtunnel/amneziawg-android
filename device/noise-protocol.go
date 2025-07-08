@@ -206,8 +206,14 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 	handshake.mixHash(handshake.remoteStatic[:])
 
 	device.awg.ASecMux.RLock()
+	msgType, err := device.awg.Get(DefaultMessageInitiationType)
+	if err != nil {
+		device.awg.ASecMux.RUnlock()
+		return nil, fmt.Errorf("get message type: %w", err)
+	}
+
 	msg := MessageInitiation{
-		Type:      MessageInitiationType,
+		Type:      msgType,
 		Ephemeral: handshake.localEphemeral.publicKey(),
 	}
 	device.awg.ASecMux.RUnlock()
@@ -385,7 +391,12 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 
 	var msg MessageResponse
 	device.awg.ASecMux.RLock()
-	msg.Type = MessageResponseType
+	msg.Type, err = device.awg.Get(DefaultMessageResponseType)
+	if err != nil {
+		device.awg.ASecMux.RUnlock()
+		return nil, fmt.Errorf("get message type: %w", err)
+	}
+
 	device.awg.ASecMux.RUnlock()
 	msg.Sender = handshake.localIndex
 	msg.Receiver = handshake.remoteIndex

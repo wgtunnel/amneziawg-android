@@ -120,18 +120,19 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 			if device.awg.ASecCfg.TransportHeaderJunkSize != 0 {
 				sendf("s4=%d", device.awg.ASecCfg.TransportHeaderJunkSize)
 			}
-			if device.awg.ASecCfg.InitPacketMagicHeader != 0 {
-				sendf("h1=%d", device.awg.ASecCfg.InitPacketMagicHeader)
-			}
-			if device.awg.ASecCfg.ResponsePacketMagicHeader != 0 {
-				sendf("h2=%d", device.awg.ASecCfg.ResponsePacketMagicHeader)
-			}
-			if device.awg.ASecCfg.UnderloadPacketMagicHeader != 0 {
-				sendf("h3=%d", device.awg.ASecCfg.UnderloadPacketMagicHeader)
-			}
-			if device.awg.ASecCfg.TransportPacketMagicHeader != 0 {
-				sendf("h4=%d", device.awg.ASecCfg.TransportPacketMagicHeader)
-			}
+			// TODO:
+			// if device.awg.ASecCfg.InitPacketMagicHeader != 0 {
+			// 	sendf("h1=%d", device.awg.ASecCfg.InitPacketMagicHeader)
+			// }
+			// if device.awg.ASecCfg.ResponsePacketMagicHeader != 0 {
+			// 	sendf("h2=%d", device.awg.ASecCfg.ResponsePacketMagicHeader)
+			// }
+			// if device.awg.ASecCfg.UnderloadPacketMagicHeader != 0 {
+			// 	sendf("h3=%d", device.awg.ASecCfg.UnderloadPacketMagicHeader)
+			// }
+			// if device.awg.ASecCfg.TransportPacketMagicHeader != 0 {
+			// 	sendf("h4=%d", device.awg.ASecCfg.TransportPacketMagicHeader)
+			// }
 
 			specialJunkIpcFields := device.awg.HandshakeHandler.SpecialJunk.IpcGetFields()
 			for _, field := range specialJunkIpcFields {
@@ -370,33 +371,41 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg.Protocol)
 		tempAwg.ASecCfg.IsSet = true
 
 	case "h1":
-		awg.ParseMagicHeader(key, value, &tempAwg.ASecCfg.InitPacketMagicHeader)
+		magicHeader, err := awg.ParseMagicHeader(key, value)
+		if err != nil {
+			return ipcErrorf(ipc.IpcErrorInvalid, "uapi: %w", err)
+		}
 
+		tempAwg.ASecCfg.InitPacketMagicHeader = magicHeader
 		tempAwg.ASecCfg.IsSet = true
 
 	case "h2":
-		responsePacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
+		magicHeader, err := awg.ParseMagicHeader(key, value)
 		if err != nil {
-			return ipcErrorf(ipc.IpcErrorInvalid, "parse response_packet_magic_header %w", err)
+			return ipcErrorf(ipc.IpcErrorInvalid, "uapi: %w", err)
 		}
-		tempAwg.ASecCfg.ResponsePacketMagicHeader = uint32(responsePacketMagicHeader)
+
+		tempAwg.ASecCfg.ResponsePacketMagicHeader = magicHeader
 		tempAwg.ASecCfg.IsSet = true
 
 	case "h3":
-		underloadPacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
+		magicHeader, err := awg.ParseMagicHeader(key, value)
 		if err != nil {
-			return ipcErrorf(ipc.IpcErrorInvalid, "parse underload_packet_magic_header %w", err)
+			return ipcErrorf(ipc.IpcErrorInvalid, "uapi: %w", err)
 		}
-		tempAwg.ASecCfg.UnderloadPacketMagicHeader = uint32(underloadPacketMagicHeader)
+
+		tempAwg.ASecCfg.UnderloadPacketMagicHeader = magicHeader
 		tempAwg.ASecCfg.IsSet = true
 
 	case "h4":
-		transportPacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
+		magicHeader, err := awg.ParseMagicHeader(key, value)
 		if err != nil {
-			return ipcErrorf(ipc.IpcErrorInvalid, "parse transport_packet_magic_header %w", err)
+			return ipcErrorf(ipc.IpcErrorInvalid, "uapi: %w", err)
 		}
-		tempAwg.ASecCfg.TransportPacketMagicHeader = uint32(transportPacketMagicHeader)
+
+		tempAwg.ASecCfg.TransportPacketMagicHeader = magicHeader
 		tempAwg.ASecCfg.IsSet = true
+
 	case "i1", "i2", "i3", "i4", "i5":
 		if len(value) == 0 {
 			device.log.Verbosef("UAPI: received empty %s", key)
