@@ -371,39 +371,39 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg.Protocol)
 		tempAwg.ASecCfg.IsSet = true
 
 	case "h1":
-		magicHeader, err := awg.ParseMagicHeader(key, value)
+		initMagicHeader, err := awg.ParseMagicHeader(key, value)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "uapi: %w", err)
 		}
 
-		tempAwg.ASecCfg.InitPacketMagicHeader = magicHeader
+		tempAwg.ASecCfg.InitPacketMagicHeader = initMagicHeader
 		tempAwg.ASecCfg.IsSet = true
 
 	case "h2":
-		magicHeader, err := awg.ParseMagicHeader(key, value)
+		responseMagicHeader, err := awg.ParseMagicHeader(key, value)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "uapi: %w", err)
 		}
 
-		tempAwg.ASecCfg.ResponsePacketMagicHeader = magicHeader
+		tempAwg.ASecCfg.ResponsePacketMagicHeader = responseMagicHeader
 		tempAwg.ASecCfg.IsSet = true
 
 	case "h3":
-		magicHeader, err := awg.ParseMagicHeader(key, value)
+		cookieReplyMagicHeader, err := awg.ParseMagicHeader(key, value)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "uapi: %w", err)
 		}
 
-		tempAwg.ASecCfg.UnderloadPacketMagicHeader = magicHeader
+		tempAwg.ASecCfg.UnderloadPacketMagicHeader = cookieReplyMagicHeader
 		tempAwg.ASecCfg.IsSet = true
 
 	case "h4":
-		magicHeader, err := awg.ParseMagicHeader(key, value)
+		transportMagicHeader, err := awg.ParseMagicHeader(key, value)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "uapi: %w", err)
 		}
 
-		tempAwg.ASecCfg.TransportPacketMagicHeader = magicHeader
+		tempAwg.ASecCfg.TransportPacketMagicHeader = transportMagicHeader
 		tempAwg.ASecCfg.IsSet = true
 
 	case "i1", "i2", "i3", "i4", "i5":

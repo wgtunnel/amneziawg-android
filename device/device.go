@@ -648,7 +648,7 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 		isASecOn = true
 	}
 
-	limits := make([]awg.Limit, 4)
+	limits := make([]awg.MagicHeader, 4)
 
 	if tempAwg.ASecCfg.InitPacketMagicHeader.Min > 4 {
 		isASecOn = true
@@ -659,7 +659,7 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 	} else {
 		device.log.Verbosef("UAPI: Using default init type")
 		MessageInitiationType = DefaultMessageInitiationType
-		limits[0] = awg.NewLimitSameValue(DefaultMessageInitiationType)
+		limits[0] = awg.NewMagicHeaderSameValue(DefaultMessageInitiationType)
 	}
 
 	if tempAwg.ASecCfg.ResponsePacketMagicHeader.Min > 4 {
@@ -671,7 +671,7 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 	} else {
 		device.log.Verbosef("UAPI: Using default response type")
 		MessageResponseType = DefaultMessageResponseType
-		limits[1] = awg.NewLimitSameValue(DefaultMessageResponseType)
+		limits[1] = awg.NewMagicHeaderSameValue(DefaultMessageResponseType)
 	}
 
 	if tempAwg.ASecCfg.UnderloadPacketMagicHeader.Min > 4 {
@@ -683,7 +683,7 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 	} else {
 		device.log.Verbosef("UAPI: Using default underload type")
 		MessageCookieReplyType = DefaultMessageCookieReplyType
-		limits[2] = awg.NewLimitSameValue(DefaultMessageCookieReplyType)
+		limits[2] = awg.NewMagicHeaderSameValue(DefaultMessageCookieReplyType)
 	}
 
 	if tempAwg.ASecCfg.TransportPacketMagicHeader.Min > 4 {
@@ -695,7 +695,7 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 	} else {
 		device.log.Verbosef("UAPI: Using default transport type")
 		MessageTransportType = DefaultMessageTransportType
-		limits[3] = awg.NewLimitSameValue(DefaultMessageTransportType)
+		limits[3] = awg.NewMagicHeaderSameValue(DefaultMessageTransportType)
 	}
 
 	isSameHeaderMap := map[uint32]struct{}{
@@ -705,7 +705,11 @@ func (device *Device) handlePostConfig(tempAwg *awg.Protocol) error {
 		MessageTransportType:   {},
 	}
 
-	device.awg.MagicHeaders = awg.NewLimits(limits)
+	var err error
+	device.awg.MagicHeaders, err = awg.NewMagicHeaders(limits)
+	if err != nil {
+		errs = append(errs, ipcErrorf(ipc.IpcErrorInvalid, "new magic headers: %w", err))
+	}
 
 	// size will be different if same values
 	if len(isSameHeaderMap) != 4 {
@@ -859,8 +863,6 @@ func (device *Device) Logic(size int, packet *[]byte, bufsArrs *[MaxMessageSize]
 	}
 
 	junkSize := msgTypeToJunkSize[assumedMsgType]
-	fmt.Println(msgTypeToJunkSize)
-	fmt.Printf("Assumed message type: %d; size: %d", assumedMsgType, junkSize)
 
 	// transport size can align with other header types;
 	// making sure we have the right msgType
@@ -875,6 +877,7 @@ func (device *Device) Logic(size int, packet *[]byte, bufsArrs *[MaxMessageSize]
 	}
 
 	device.log.Verbosef("transport packet lined up with another msg type")
+
 	return device.handleTransport(size, packet, bufsArrs)
 }
 
@@ -883,8 +886,9 @@ func (device *Device) getMsgType(packet *[]byte, junkSize int) (uint32, error) {
 	msgType, err := device.awg.GetLimitMin(msgTypeRange)
 
 	if err != nil {
-		return 0, fmt.Errorf("aSec: get limit min for message type range: %d; %w", msgTypeRange, err)
+		return 0, fmt.Errorf("get limit min: %w", err)
 	}
+
 	return msgType, nil
 }
 
