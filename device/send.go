@@ -537,7 +537,7 @@ func (device *Device) RoutineEncryption(id int) {
 
 			msgType, err := device.awg.Get(DefaultMessageTransportType)
 			if err != nil {
-				device.log.Errorf("Get message type for transport: %v", err)
+				device.log.Errorf("get message type for transport: %v", err)
 				continue
 			}
 			binary.LittleEndian.PutUint32(fieldType, msgType)

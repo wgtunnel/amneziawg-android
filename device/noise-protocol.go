@@ -271,6 +271,7 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	)
 
 	device.awg.ASecMux.RLock()
+
 	if msg.Type != MessageInitiationType {
 		device.awg.ASecMux.RUnlock()
 		return nil
@@ -448,6 +449,7 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 
 func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 	device.awg.ASecMux.RLock()
+
 	if msg.Type != MessageResponseType {
 		device.awg.ASecMux.RUnlock()
 		return nil

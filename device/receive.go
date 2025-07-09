@@ -142,7 +142,7 @@ func (device *Device) RoutineReceiveIncoming(
 			if device.isAWG() {
 				msgType, err = device.Logic(size, &packet, bufsArrs[i])
 				if err != nil {
-					device.log.Verbosef("awg device logic: %w", err)
+					device.log.Verbosef("awg device logic: %v", err)
 					continue
 				}
 			} else {
@@ -378,6 +378,9 @@ func (device *Device) RoutineHandshake(id int) {
 				goto skip
 			}
 
+			// have to reassign msgType for ranged msgType to work
+			msg.Type = elem.msgType
+
 			// consume initiation
 			peer := device.ConsumeMessageInitiation(&msg)
 			if peer == nil {
@@ -409,6 +412,9 @@ func (device *Device) RoutineHandshake(id int) {
 				device.log.Errorf("Failed to decode response message")
 				goto skip
 			}
+
+			// have to reassign msgType for ranged msgType to work
+			msg.Type = elem.msgType
 
 			// consume response
 
