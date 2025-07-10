@@ -378,7 +378,7 @@ func TestNewMagicHeaders(t *testing.T) {
 				require.Equal(t, MagicHeaders{}, result)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tt.magicHeaders, result.headerValues)
+				require.Equal(t, tt.magicHeaders, result.Values)
 				require.NotNil(t, result.randomGenerator)
 			}
 		})
@@ -469,7 +469,7 @@ func TestMagicHeaders_Get(t *testing.T) {
 			t.Parallel()
 			// Create a new instance with mock PRNG for each test
 			testMagicHeaders := MagicHeaders{
-				headerValues:    headers,
+				Values:          headers,
 				randomGenerator: &mockPRNG{returnValue: tt.mockValue},
 			}
 

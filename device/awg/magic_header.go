@@ -58,7 +58,7 @@ func ParseMagicHeader(key, value string) (MagicHeader, error) {
 }
 
 type MagicHeaders struct {
-	headerValues    []MagicHeader
+	Values    []MagicHeader
 	randomGenerator RandomNumberGenerator[uint32]
 }
 
@@ -81,7 +81,7 @@ func NewMagicHeaders(headerValues []MagicHeader) (MagicHeaders, error) {
 		}
 	}
 
-	return MagicHeaders{headerValues: headerValues, randomGenerator: NewPRNG[uint32]()}, nil
+	return MagicHeaders{Values: headerValues, randomGenerator: NewPRNG[uint32]()}, nil
 }
 
 func (mh *MagicHeaders) Get(defaultMsgType uint32) (uint32, error) {
@@ -89,5 +89,5 @@ func (mh *MagicHeaders) Get(defaultMsgType uint32) (uint32, error) {
 		return 0, fmt.Errorf("invalid msg type: %d", defaultMsgType)
 	}
 
-	return mh.randomGenerator.RandomSizeInRange(mh.headerValues[defaultMsgType-1].Min, mh.headerValues[defaultMsgType-1].Max), nil
+	return mh.randomGenerator.RandomSizeInRange(mh.Values[defaultMsgType-1].Min, mh.Values[defaultMsgType-1].Max), nil
 }

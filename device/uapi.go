@@ -120,19 +120,16 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 			if device.awg.Cfg.TransportHeaderJunkSize != 0 {
 				sendf("s4=%d", device.awg.Cfg.TransportHeaderJunkSize)
 			}
-			// TODO:
-			// if device.awg.ASecCfg.InitPacketMagicHeader != 0 {
-			// 	sendf("h1=%d", device.awg.ASecCfg.InitPacketMagicHeader)
-			// }
-			// if device.awg.ASecCfg.ResponsePacketMagicHeader != 0 {
-			// 	sendf("h2=%d", device.awg.ASecCfg.ResponsePacketMagicHeader)
-			// }
-			// if device.awg.ASecCfg.UnderloadPacketMagicHeader != 0 {
-			// 	sendf("h3=%d", device.awg.ASecCfg.UnderloadPacketMagicHeader)
-			// }
-			// if device.awg.ASecCfg.TransportPacketMagicHeader != 0 {
-			// 	sendf("h4=%d", device.awg.ASecCfg.TransportPacketMagicHeader)
-			// }
+			for i, magicHeader := range device.awg.Cfg.MagicHeaders.Values {
+				if magicHeader.Min > 4 {
+					if magicHeader.Min == magicHeader.Max {
+						sendf("h%d=%d", i+1, magicHeader.Min)
+						continue
+					}
+
+					sendf("h%d=%d-%d", i+1, magicHeader.Min, magicHeader.Max)
+				}
+			}
 
 			specialJunkIpcFields := device.awg.HandshakeHandler.SpecialJunk.IpcGetFields()
 			for _, field := range specialJunkIpcFields {
@@ -201,6 +198,8 @@ func (device *Device) IpcSetOperation(r io.Reader) (err error) {
 	deviceConfig := true
 
 	tempAwg := awg.Protocol{}
+	tempAwg.Cfg.MagicHeaders.Values = make([]awg.MagicHeader, 4)
+
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -369,43 +368,38 @@ func (device *Device) handleDeviceLine(key, value string, tempAwg *awg.Protocol)
 		device.log.Verbosef("UAPI: Updating transport_packet_junk_size")
 		tempAwg.Cfg.TransportHeaderJunkSize = transportPacketJunkSize
 		tempAwg.Cfg.IsSet = true
-
 	case "h1":
 		initMagicHeader, err := awg.ParseMagicHeader(key, value)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "uapi: %w", err)
 		}
 
-		tempAwg.Cfg.InitPacketMagicHeader = initMagicHeader
+		tempAwg.Cfg.MagicHeaders.Values[0] = initMagicHeader
 		tempAwg.Cfg.IsSet = true
-
 	case "h2":
 		responseMagicHeader, err := awg.ParseMagicHeader(key, value)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "uapi: %w", err)
 		}
 
-		tempAwg.Cfg.ResponsePacketMagicHeader = responseMagicHeader
+		tempAwg.Cfg.MagicHeaders.Values[1] = responseMagicHeader
 		tempAwg.Cfg.IsSet = true
-
 	case "h3":
 		cookieReplyMagicHeader, err := awg.ParseMagicHeader(key, value)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "uapi: %w", err)
 		}
 
-		tempAwg.Cfg.UnderloadPacketMagicHeader = cookieReplyMagicHeader
+		tempAwg.Cfg.MagicHeaders.Values[2] = cookieReplyMagicHeader
 		tempAwg.Cfg.IsSet = true
-
 	case "h4":
 		transportMagicHeader, err := awg.ParseMagicHeader(key, value)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "uapi: %w", err)
 		}
 
-		tempAwg.Cfg.TransportPacketMagicHeader = transportMagicHeader
+		tempAwg.Cfg.MagicHeaders.Values[3] = transportMagicHeader
 		tempAwg.Cfg.IsSet = true
-
 	case "i1", "i2", "i3", "i4", "i5":
 		if len(value) == 0 {
 			device.log.Verbosef("UAPI: received empty %s", key)

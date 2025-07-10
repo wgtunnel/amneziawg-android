@@ -18,19 +18,15 @@ type Cfg struct {
 	CookieReplyHeaderJunkSize int
 	TransportHeaderJunkSize   int
 
-	InitPacketMagicHeader      MagicHeader
-	ResponsePacketMagicHeader  MagicHeader
-	UnderloadPacketMagicHeader MagicHeader
-	TransportPacketMagicHeader MagicHeader
+	MagicHeaders MagicHeaders
 }
 
 type Protocol struct {
 	IsOn abool.AtomicBool
 	// TODO: revision the need of the mutex
-	Mux          sync.RWMutex
-	Cfg          Cfg
-	JunkCreator  JunkCreator
-	MagicHeaders MagicHeaders
+	Mux         sync.RWMutex
+	Cfg         Cfg
+	JunkCreator JunkCreator
 
 	HandshakeHandler SpecialHandshakeHandler
 }
@@ -80,9 +76,9 @@ func (protocol *Protocol) createHeaderJunk(junkSize int, extraSize int) ([]byte,
 }
 
 func (protocol *Protocol) GetMagicHeaderMinFor(msgType uint32) (uint32, error) {
-	for _, limit := range protocol.MagicHeaders.headerValues {
-		if limit.Min <= msgType && msgType <= limit.Max {
-			return limit.Min, nil
+	for _, magicHeader := range protocol.Cfg.MagicHeaders.Values {
+		if magicHeader.Min <= msgType && msgType <= magicHeader.Max {
+			return magicHeader.Min, nil
 		}
 	}
 
@@ -90,5 +86,5 @@ func (protocol *Protocol) GetMagicHeaderMinFor(msgType uint32) (uint32, error) {
 }
 
 func (protocol *Protocol) GetMsgType(defaultMsgType uint32) (uint32, error) {
-	return protocol.MagicHeaders.Get(defaultMsgType)
+	return protocol.Cfg.MagicHeaders.Get(defaultMsgType)
 }
