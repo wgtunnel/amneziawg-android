@@ -7,6 +7,12 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
+type RandomNumberGenerator[T constraints.Integer] interface {
+	RandomSizeInRange(min, max T) T
+	Get() uint64
+	ReadSize(size int) []byte
+}
+
 type PRNG[T constraints.Integer] struct {
 	cha8Rand *v2.ChaCha8
 }

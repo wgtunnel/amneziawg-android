@@ -82,14 +82,14 @@ func (protocol *Protocol) createHeaderJunk(junkSize int, extraSize int) ([]byte,
 	return junk, nil
 }
 
-func (protocol *Protocol) GetLimitMin(msgTypeRange uint32) (uint32, error) {
-	for _, limit := range protocol.MagicHeaders.headers {
+func (protocol *Protocol) GetMagicHeaderMinFor(msgTypeRange uint32) (uint32, error) {
+	for _, limit := range protocol.MagicHeaders.headerValues {
 		if limit.Min <= msgTypeRange && msgTypeRange <= limit.Max {
 			return limit.Min, nil
 		}
 	}
 
-	return 0, fmt.Errorf("no limit for range: %d", msgTypeRange)
+	return 0, fmt.Errorf("no header for range: %d", msgTypeRange)
 }
 
 func (protocol *Protocol) GetMsgType(defaultMsgType uint32) (uint32, error) {

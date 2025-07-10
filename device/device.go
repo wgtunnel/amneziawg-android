@@ -883,7 +883,7 @@ func (device *Device) Logic(size int, packet *[]byte, bufsArrs *[MaxMessageSize]
 
 func (device *Device) getMsgType(packet *[]byte, junkSize int) (uint32, error) {
 	msgTypeRange := binary.LittleEndian.Uint32((*packet)[junkSize : junkSize+4])
-	msgType, err := device.awg.GetLimitMin(msgTypeRange)
+	msgType, err := device.awg.GetMagicHeaderMinFor(msgTypeRange)
 
 	if err != nil {
 		return 0, fmt.Errorf("get limit min: %w", err)

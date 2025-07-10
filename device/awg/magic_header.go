@@ -35,6 +35,8 @@ func ParseMagicHeader(key, value string) (MagicHeader, error) {
 		}
 
 		return NewMagicHeader(uint32(magicHeader), uint32(magicHeader))
+	} else if len(splitLimits[0]) == 0 || len(splitLimits[1]) == 0 {
+		return MagicHeader{}, fmt.Errorf("invalid value for key: %s; value: %s; expected format: min-max", key, value)
 	}
 
 	min, err := strconv.ParseUint(splitLimits[0], 10, 32)
@@ -56,30 +58,30 @@ func ParseMagicHeader(key, value string) (MagicHeader, error) {
 }
 
 type MagicHeaders struct {
-	headers         []MagicHeader
-	randomGenerator PRNG[uint32]
+	headerValues    []MagicHeader
+	randomGenerator RandomNumberGenerator[uint32]
 }
 
-func NewMagicHeaders(magicHeaders []MagicHeader) (MagicHeaders, error) {
-	if len(magicHeaders) != 4 {
-		return MagicHeaders{}, fmt.Errorf("all header types should be included: %v", magicHeaders)
+func NewMagicHeaders(headerValues []MagicHeader) (MagicHeaders, error) {
+	if len(headerValues) != 4 {
+		return MagicHeaders{}, fmt.Errorf("all header types should be included: %v", headerValues)
 	}
 
-	sortedMagicHeaders := slices.SortedFunc(slices.Values(magicHeaders), func(lhs MagicHeader, rhs MagicHeader) int {
+	sortedMagicHeaders := slices.SortedFunc(slices.Values(headerValues), func(lhs MagicHeader, rhs MagicHeader) int {
 		return cmp.Compare(lhs.Min, rhs.Min)
 	})
 
 	for i := range 3 {
-		if sortedMagicHeaders[i].Min > sortedMagicHeaders[i+1].Min {
+		if sortedMagicHeaders[i].Max >= sortedMagicHeaders[i+1].Min {
 			return MagicHeaders{}, fmt.Errorf(
 				"magic headers shouldn't overlap; %v > %v",
-				sortedMagicHeaders[i-1].Min,
-				sortedMagicHeaders[i].Min,
+				sortedMagicHeaders[i].Max,
+				sortedMagicHeaders[i+1].Min,
 			)
 		}
 	}
 
-	return MagicHeaders{headers: magicHeaders, randomGenerator: NewPRNG[uint32]()}, nil
+	return MagicHeaders{headerValues: headerValues, randomGenerator: NewPRNG[uint32]()}, nil
 }
 
 func (mh *MagicHeaders) Get(defaultMsgType uint32) (uint32, error) {
@@ -87,5 +89,5 @@ func (mh *MagicHeaders) Get(defaultMsgType uint32) (uint32, error) {
 		return 0, fmt.Errorf("invalid msg type: %d", defaultMsgType)
 	}
 
-	return mh.randomGenerator.RandomSizeInRange(mh.headers[defaultMsgType-1].Min, mh.headers[defaultMsgType-1].Max), nil
+	return mh.randomGenerator.RandomSizeInRange(mh.headerValues[defaultMsgType-1].Min, mh.headerValues[defaultMsgType-1].Max), nil
 }
