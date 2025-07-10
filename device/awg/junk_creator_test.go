@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func setUpJunkCreator() junkCreator {
-	jc := NewJunkCreator(aSecCfgType{
+func setUpJunkCreator() JunkCreator {
+	jc := NewJunkCreator(Cfg{
 		IsSet:                  true,
 		JunkPacketCount:        5,
 		JunkPacketMinSize:      500,
@@ -27,7 +27,7 @@ func setUpJunkCreator() junkCreator {
 func Test_junkCreator_createJunkPackets(t *testing.T) {
 	jc := setUpJunkCreator()
 	t.Run("valid", func(t *testing.T) {
-		got := make([][]byte, 0, jc.aSecCfg.JunkPacketCount)
+		got := make([][]byte, 0, jc.cfg.JunkPacketCount)
 		jc.CreateJunkPackets(&got)
 		seen := make(map[string]bool)
 		for _, junk := range got {
@@ -62,13 +62,13 @@ func Test_junkCreator_randomPacketSize(t *testing.T) {
 	jc := setUpJunkCreator()
 	for range [30]struct{}{} {
 		t.Run("valid", func(t *testing.T) {
-			if got := jc.randomPacketSize(); jc.aSecCfg.JunkPacketMinSize > got ||
-				got > jc.aSecCfg.JunkPacketMaxSize {
+			if got := jc.randomPacketSize(); jc.cfg.JunkPacketMinSize > got ||
+				got > jc.cfg.JunkPacketMaxSize {
 				t.Errorf(
 					"junkCreator.randomPacketSize() = %v, not between range [%v,%v]",
 					got,
-					jc.aSecCfg.JunkPacketMinSize,
-					jc.aSecCfg.JunkPacketMaxSize,
+					jc.cfg.JunkPacketMinSize,
+					jc.cfg.JunkPacketMaxSize,
 				)
 			}
 		})

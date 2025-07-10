@@ -5,23 +5,23 @@ import (
 	"fmt"
 )
 
-type junkCreator struct {
-	aSecCfg         aSecCfgType
+type JunkCreator struct {
+	cfg             Cfg
 	randomGenerator PRNG[int]
 }
 
 // TODO: refactor param to only pass the junk related params
-func NewJunkCreator(aSecCfg aSecCfgType) junkCreator {
-	return junkCreator{aSecCfg: aSecCfg, randomGenerator: NewPRNG[int]()}
+func NewJunkCreator(cfg Cfg) JunkCreator {
+	return JunkCreator{cfg: cfg, randomGenerator: NewPRNG[int]()}
 }
 
-// Should be called with aSecMux RLocked
-func (jc *junkCreator) CreateJunkPackets(junks *[][]byte) {
-	if jc.aSecCfg.JunkPacketCount == 0 {
+// Should be called with awg mux RLocked
+func (jc *JunkCreator) CreateJunkPackets(junks *[][]byte) {
+	if jc.cfg.JunkPacketCount == 0 {
 		return
 	}
 
-	for range jc.aSecCfg.JunkPacketCount {
+	for range jc.cfg.JunkPacketCount {
 		packetSize := jc.randomPacketSize()
 		junk := jc.randomJunkWithSize(packetSize)
 		*junks = append(*junks, junk)
@@ -29,13 +29,13 @@ func (jc *junkCreator) CreateJunkPackets(junks *[][]byte) {
 	return
 }
 
-// Should be called with aSecMux RLocked
-func (jc *junkCreator) randomPacketSize() int {
-	return jc.randomGenerator.RandomSizeInRange(jc.aSecCfg.JunkPacketMinSize, jc.aSecCfg.JunkPacketMaxSize)
+// Should be called with awg mux RLocked
+func (jc *JunkCreator) randomPacketSize() int {
+	return jc.randomGenerator.RandomSizeInRange(jc.cfg.JunkPacketMinSize, jc.cfg.JunkPacketMaxSize)
 }
 
-// Should be called with aSecMux RLocked
-func (jc *junkCreator) AppendJunk(writer *bytes.Buffer, size int) error {
+// Should be called with awg mux RLocked
+func (jc *JunkCreator) AppendJunk(writer *bytes.Buffer, size int) error {
 	headerJunk := jc.randomJunkWithSize(size)
 	_, err := writer.Write(headerJunk)
 	if err != nil {
@@ -44,7 +44,7 @@ func (jc *junkCreator) AppendJunk(writer *bytes.Buffer, size int) error {
 	return nil
 }
 
-// Should be called with aSecMux RLocked
-func (jc *junkCreator) randomJunkWithSize(size int) []byte {
+// Should be called with awg mux RLocked
+func (jc *JunkCreator) randomJunkWithSize(size int) []byte {
 	return jc.randomGenerator.ReadSize(size)
 }

@@ -130,7 +130,7 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	if peer.device.version >= VersionAwg {
 		var junks [][]byte
 		if peer.device.version == VersionAwgSpecialHandshake {
-			peer.device.awg.ASecMux.RLock()
+			peer.device.awg.Mux.RLock()
 			// set junks depending on packet type
 			junks = peer.device.awg.HandshakeHandler.GenerateSpecialJunk()
 			if junks == nil {
@@ -141,13 +141,13 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 			} else {
 				peer.device.log.Verbosef("%v - Special junks sent", peer)
 			}
-			peer.device.awg.ASecMux.RUnlock()
+			peer.device.awg.Mux.RUnlock()
 		} else {
-			junks = make([][]byte, 0, peer.device.awg.ASecCfg.JunkPacketCount)
+			junks = make([][]byte, 0, peer.device.awg.Cfg.JunkPacketCount)
 		}
-		peer.device.awg.ASecMux.RLock()
+		peer.device.awg.Mux.RLock()
 		peer.device.awg.JunkCreator.CreateJunkPackets(&junks)
-		peer.device.awg.ASecMux.RUnlock()
+		peer.device.awg.Mux.RUnlock()
 
 		if len(junks) > 0 {
 			err = peer.SendBuffers(junks)

@@ -8,7 +8,7 @@ import (
 	"github.com/tevino/abool"
 )
 
-type aSecCfgType struct {
+type Cfg struct {
 	IsSet                     bool
 	JunkPacketCount           int
 	JunkPacketMinSize         int
@@ -25,42 +25,42 @@ type aSecCfgType struct {
 }
 
 type Protocol struct {
-	IsASecOn abool.AtomicBool
+	IsOn abool.AtomicBool
 	// TODO: revision the need of the mutex
-	ASecMux      sync.RWMutex
-	ASecCfg      aSecCfgType
-	JunkCreator  junkCreator
+	Mux          sync.RWMutex
+	Cfg          Cfg
+	JunkCreator  JunkCreator
 	MagicHeaders MagicHeaders
 
 	HandshakeHandler SpecialHandshakeHandler
 }
 
 func (protocol *Protocol) CreateInitHeaderJunk() ([]byte, error) {
-	protocol.ASecMux.RLock()
-	defer protocol.ASecMux.RUnlock()
+	protocol.Mux.RLock()
+	defer protocol.Mux.RUnlock()
 
-	return protocol.createHeaderJunk(protocol.ASecCfg.InitHeaderJunkSize, 0)
+	return protocol.createHeaderJunk(protocol.Cfg.InitHeaderJunkSize, 0)
 }
 
 func (protocol *Protocol) CreateResponseHeaderJunk() ([]byte, error) {
-	protocol.ASecMux.RLock()
-	defer protocol.ASecMux.RUnlock()
+	protocol.Mux.RLock()
+	defer protocol.Mux.RUnlock()
 
-	return protocol.createHeaderJunk(protocol.ASecCfg.ResponseHeaderJunkSize, 0)
+	return protocol.createHeaderJunk(protocol.Cfg.ResponseHeaderJunkSize, 0)
 }
 
 func (protocol *Protocol) CreateCookieReplyHeaderJunk() ([]byte, error) {
-	protocol.ASecMux.RLock()
-	defer protocol.ASecMux.RUnlock()
+	protocol.Mux.RLock()
+	defer protocol.Mux.RUnlock()
 
-	return protocol.createHeaderJunk(protocol.ASecCfg.CookieReplyHeaderJunkSize, 0)
+	return protocol.createHeaderJunk(protocol.Cfg.CookieReplyHeaderJunkSize, 0)
 }
 
 func (protocol *Protocol) CreateTransportHeaderJunk(packetSize int) ([]byte, error) {
-	protocol.ASecMux.RLock()
-	defer protocol.ASecMux.RUnlock()
+	protocol.Mux.RLock()
+	defer protocol.Mux.RUnlock()
 
-	return protocol.createHeaderJunk(protocol.ASecCfg.TransportHeaderJunkSize, packetSize)
+	return protocol.createHeaderJunk(protocol.Cfg.TransportHeaderJunkSize, packetSize)
 }
 
 func (protocol *Protocol) createHeaderJunk(junkSize int, extraSize int) ([]byte, error) {
@@ -68,7 +68,6 @@ func (protocol *Protocol) createHeaderJunk(junkSize int, extraSize int) ([]byte,
 		return nil, nil
 	}
 
-	var junk []byte
 	buf := make([]byte, 0, junkSize+extraSize)
 	writer := bytes.NewBuffer(buf[:0])
 
@@ -77,19 +76,17 @@ func (protocol *Protocol) createHeaderJunk(junkSize int, extraSize int) ([]byte,
 		return nil, fmt.Errorf("append junk: %w", err)
 	}
 
-	junk = writer.Bytes()
-
-	return junk, nil
+	return writer.Bytes(), nil
 }
 
-func (protocol *Protocol) GetMagicHeaderMinFor(msgTypeRange uint32) (uint32, error) {
+func (protocol *Protocol) GetMagicHeaderMinFor(msgType uint32) (uint32, error) {
 	for _, limit := range protocol.MagicHeaders.headerValues {
-		if limit.Min <= msgTypeRange && msgTypeRange <= limit.Max {
+		if limit.Min <= msgType && msgType <= limit.Max {
 			return limit.Min, nil
 		}
 	}
 
-	return 0, fmt.Errorf("no header for range: %d", msgTypeRange)
+	return 0, fmt.Errorf("no header for value: %d", msgType)
 }
 
 func (protocol *Protocol) GetMsgType(defaultMsgType uint32) (uint32, error) {

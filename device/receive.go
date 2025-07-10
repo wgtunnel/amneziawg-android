@@ -129,7 +129,7 @@ func (device *Device) RoutineReceiveIncoming(
 		}
 		deathSpiral = 0
 
-		device.awg.ASecMux.RLock()
+		device.awg.Mux.RLock()
 		// handle each packet in the batch
 		for i, size := range sizes[:count] {
 			if size < MinMessageSize {
@@ -140,9 +140,10 @@ func (device *Device) RoutineReceiveIncoming(
 			packet := bufsArrs[i][:size]
 			var msgType uint32
 			if device.isAWG() {
-				msgType, err = device.Logic(size, &packet, bufsArrs[i])
+				msgType, err = device.ProcessAWGPacket(size, &packet, bufsArrs[i])
+
 				if err != nil {
-					device.log.Verbosef("awg device logic: %v", err)
+					device.log.Verbosef("awg: process packet: %v", err)
 					continue
 				}
 			} else {
@@ -232,7 +233,7 @@ func (device *Device) RoutineReceiveIncoming(
 			default:
 			}
 		}
-		device.awg.ASecMux.RUnlock()
+		device.awg.Mux.RUnlock()
 		for peer, elemsContainer := range elemsByPeer {
 			if peer.isRunning.Load() {
 				peer.queue.inbound.c <- elemsContainer
@@ -291,7 +292,7 @@ func (device *Device) RoutineHandshake(id int) {
 
 	for elem := range device.queue.handshake.c {
 
-		device.awg.ASecMux.RLock()
+		device.awg.Mux.RLock()
 
 		// handle cookie fields and ratelimiting
 
@@ -449,7 +450,7 @@ func (device *Device) RoutineHandshake(id int) {
 			peer.SendKeepalive()
 		}
 	skip:
-		device.awg.ASecMux.RUnlock()
+		device.awg.Mux.RUnlock()
 		device.PutMessageBuffer(elem.buffer)
 	}
 }
