@@ -1,7 +1,7 @@
 [versions]
 agp = "8.10.1"
 kotlin = "2.1.20"
-nmcp = "0.0.8"
+nmcp = "1.0.1"
 
 [libraries]
 androidx-activity-ktx = "androidx.activity:activity-ktx:1.10.1"
@@ -28,4 +28,4 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
-nmcp = { id = "com.gradleup.nmcp", version.ref = "nmcp" }
+nmcp = { id = "com.gradleup.nmcp.aggregation", version.ref = "nmcp" }

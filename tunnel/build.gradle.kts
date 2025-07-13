@@ -9,7 +9,6 @@ plugins {
     alias(libs.plugins.android.library)
     `maven-publish`
     signing
-    alias(libs.plugins.nmcp)
 }
 
 android {
@@ -109,27 +108,12 @@ publishing {
             }
         }
     }
-    repositories {
-        maven {
-            name = "sonatype"
-            url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
-            credentials {
-                username = getLocalProperty("MAVEN_CENTRAL_USER")
-                password = getLocalProperty("MAVEN_CENTRAL_PASS")
-            }
-        }
-    }
-}
-
-
-nmcp {
-    publishAllPublications {
-        username = getLocalProperty("MAVEN_CENTRAL_USER")
-        password = getLocalProperty("MAVEN_CENTRAL_PASS")
-    }
 }
 
 
 signing {
+    extra["signing.keyId"] = getLocalProperty("KEY_ID")
+    extra["signing.secretKeyRingFile"] = getLocalProperty("SECRET_KEY_RING_FILE")
+    extra["signing.password"] = getLocalProperty("PASSWORD")
     sign(publishing.publications)
 }

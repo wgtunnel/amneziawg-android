@@ -3,14 +3,19 @@ plugins {
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.kapt) apply false
-    id("com.gradleup.nmcp").version("0.0.8")
+    alias(libs.plugins.nmcp)
 }
 
-nmcp {
-    publishAggregation {
-        project(":tunnel")
+nmcpAggregation {
+    centralPortal {
         username = getLocalProperty("MAVEN_CENTRAL_USER")
         password = getLocalProperty("MAVEN_CENTRAL_PASS")
-        publicationType = "AUTOMATIC"
+        // publish manually from the portal
+        publishingType = "USER_MANAGED"
+        // or if you want to publish automatically
+        publishingType = "AUTOMATIC"
     }
+
+    // Publish all projects that apply the 'maven-publish' plugin
+    publishAllProjectsProbablyBreakingProjectIsolation()
 }
