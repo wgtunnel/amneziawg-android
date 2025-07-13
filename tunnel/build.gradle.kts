@@ -9,7 +9,7 @@ plugins {
     alias(libs.plugins.android.library)
     `maven-publish`
     signing
-    id("com.gradleup.nmcp").version("0.0.8")
+    alias(libs.plugins.nmcp)
 }
 
 android {
