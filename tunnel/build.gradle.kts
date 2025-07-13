@@ -32,6 +32,7 @@ android {
                 cmake {
                     targets("libam-go.so", "libam.so", "libam-quick.so")
                     arguments("-DGRADLE_USER_HOME=${project.gradle.gradleUserHomeDir}")
+                    arguments("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
                 }
             }
         }
