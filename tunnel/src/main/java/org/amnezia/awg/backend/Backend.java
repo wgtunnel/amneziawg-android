@@ -9,6 +9,7 @@ import org.amnezia.awg.config.Config;
 import org.amnezia.awg.util.NonNullForAll;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Set;
 
 import androidx.annotation.Nullable;
@@ -41,7 +42,7 @@ public interface Backend {
      * @return The state of the backend.
      * @throws Exception Exception raised when retrieving tunnel's state.
      */
-    BackendState getBackendState() throws Exception;
+    BackendStatus getBackendStatus() throws Exception;
 
     /**
      * Get statistics about traffic and errors on this tunnel. If the tunnel is not running, the
@@ -75,11 +76,44 @@ public interface Backend {
     Tunnel.State setState(Tunnel tunnel, Tunnel.State state, @Nullable Config config) throws Exception;
 
 
-    BackendState setBackendState(BackendState backendState, Collection<String> allowedIps) throws Exception;
+    BackendStatus setBackendStatus(BackendStatus backendStatus) throws Exception;
 
-    enum BackendState {
-        KILL_SWITCH_ACTIVE,
-        SERVICE_ACTIVE,
-        INACTIVE
+
+    abstract class BackendStatus {
+
+        private BackendStatus() {}
+
+
+        /**
+         * Backend has a kill switch status and will engage kill switch when the tunnel goes down
+         */
+        public static final class KillSwitchActive extends BackendStatus {
+            private final Collection<String> allowedIps;
+
+            public KillSwitchActive(Collection<String> allowedIps) {
+                this.allowedIps = Collections.unmodifiableCollection(allowedIps);
+            }
+
+            public Collection<String> getAllowedIps() {
+                return allowedIps;
+            }
+        }
+
+        /**
+         * Backend has already created a VpnService instance
+         */
+        public static final class ServiceActive extends BackendStatus {
+            public static final ServiceActive INSTANCE = new ServiceActive();
+            private ServiceActive() {}
+        }
+
+        /**
+         * Backend has no VpnService instance
+         */
+        public static final class Inactive extends BackendStatus {
+            public static final Inactive INSTANCE = new Inactive();
+            private Inactive() {}
+        }
     }
+
 }
