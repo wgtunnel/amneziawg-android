@@ -49,9 +49,7 @@ public final class GoBackend implements Backend {
     @Nullable private Config currentConfig;
     @Nullable private Tunnel currentTunnel;
     private int currentTunnelHandle = -1;
-    private BackendState backendState = BackendState.INACTIVE;
-    private BackendState backendSettingState = BackendState.INACTIVE;
-    private Collection<String> allowedIps = Collections.emptyList();
+    private BackendStatus backendStatus = BackendStatus.Inactive.INSTANCE;
 
     /**
      * Public constructor for GoBackend.
@@ -103,8 +101,8 @@ public final class GoBackend implements Backend {
     }
 
     @Override
-    public BackendState getBackendState() throws Exception {
-        return backendState;
+    public BackendStatus getBackendStatus() {
+        return backendStatus;
     }
 
     /**
@@ -229,50 +227,57 @@ public final class GoBackend implements Backend {
     }
 
     @Override
-    public BackendState setBackendState(BackendState backendState, Collection<String> allowedIps) throws Exception {
-        Log.d(TAG, "Set backend state");
-        this.backendSettingState = backendState;
-        //already active, return
-        if(this.backendState == backendState && this.allowedIps.equals(allowedIps)) {
-            Log.d(TAG, "Already state set");
-            return backendState;
+    public BackendStatus setBackendStatus(BackendStatus backendStatus) throws Exception {
+
+        if ((this.backendStatus instanceof BackendStatus.Inactive && backendStatus instanceof BackendStatus.Inactive) ||
+                (this.backendStatus instanceof BackendStatus.ServiceActive && backendStatus instanceof BackendStatus.ServiceActive) ||
+        (this.backendStatus instanceof BackendStatus.KillSwitchActive currentKillSwitch &&
+                backendStatus instanceof BackendStatus.KillSwitchActive newKillSwitch &&
+                currentKillSwitch.getAllowedIps() == newKillSwitch.getAllowedIps())) {
+            Log.d(TAG, "Backend status already active");
+            return this.backendStatus;
         }
-        //tunnel running, set allowedIps and return
-        if(currentTunnel != null) {
-            Log.d(TAG, "Tunnel already running");
-            this.allowedIps = allowedIps;
-            return backendState;
+
+        if (currentTunnel != null) {
+            Log.d(TAG, "Tunnel running, deferring status change until tunnel is down");
+            this.backendStatus = backendStatus;
+            return backendStatus;
         }
-        switch (backendSettingState) {
-            case KILL_SWITCH_ACTIVE -> {
-                Log.d(TAG, "Starting kill switch");
-                activateKillSwitch(allowedIps);
-            }
-            case SERVICE_ACTIVE -> {
-                activateService();
-            }
-            case INACTIVE -> {
-                Log.d(TAG, "Inactive, shutting down");
-                shutdown();
-            }
+
+        // Handle each BackendStatus subclass
+        if (backendStatus instanceof BackendStatus.KillSwitchActive killSwitch) {
+            Log.d(TAG, "Starting kill switch");
+            activateKillSwitch(killSwitch.getAllowedIps());
+        } else if (backendStatus instanceof BackendStatus.ServiceActive) {
+            Log.d(TAG, "Starting service");
+            activateService();
+        } else if (backendStatus instanceof BackendStatus.Inactive) {
+            Log.d(TAG, "Inactive, shutting down");
+            shutdown();
+        } else {
+            throw new IllegalStateException("Unknown BackendStatus subclass: " + backendStatus.getClass().getName());
         }
-        return backendSettingState;
+
+        return this.backendStatus;
     }
+
 
     private void shutdown() throws Exception {
         Log.d(TAG, "Shutdown..");
-        if(backendState == BackendState.INACTIVE) return;
+        if(backendStatus instanceof BackendStatus.Inactive) return;
         Log.d(TAG, "Shutting down vpn service");
         try {
             VpnService service = vpnService.get(0, TimeUnit.NANOSECONDS);
             Log.d(TAG, "Turning off killswitch");
-            if(backendState == BackendState.KILL_SWITCH_ACTIVE) service.deactivateKillSwitch();
+            if(backendStatus instanceof BackendStatus.KillSwitchActive) service.deactivateKillSwitch();
             Log.d(TAG, "Stopping self");
             service.stopSelf();
         } catch (final TimeoutException | ExecutionException | InterruptedException e) {
             final Exception be = new BackendException(Reason.SERVICE_NOT_RUNNING);
             be.initCause(e);
             throw be;
+        } finally {
+            backendStatus = BackendStatus.Inactive.INSTANCE;
         }
     }
 
@@ -410,16 +415,12 @@ public final class GoBackend implements Backend {
             currentTunnel = null;
             currentTunnelHandle = -1;
             currentConfig = null;
-            switch (backendSettingState) {
-                case KILL_SWITCH_ACTIVE -> {
-                    activateKillSwitch(this.allowedIps);
-                }
-                case SERVICE_ACTIVE -> {
-                    activateService();
-                }
-                case INACTIVE -> {
-                    shutdown();
-                }
+            if (backendStatus instanceof BackendStatus.KillSwitchActive killSwitch) {
+                activateKillSwitch(killSwitch.getAllowedIps());
+            } else if (backendStatus instanceof BackendStatus.ServiceActive) {
+                activateService();
+            } else if (backendStatus instanceof BackendStatus.Inactive) {
+                shutdown();
             }
         }
         tunnel.onStateChange(state);
@@ -432,26 +433,25 @@ public final class GoBackend implements Backend {
         }
         try {
             VpnService service = vpnService.get(2, TimeUnit.SECONDS);
-            if(backendState == BackendState.KILL_SWITCH_ACTIVE) service.deactivateKillSwitch();
+            if(backendStatus instanceof BackendStatus.KillSwitchActive) service.deactivateKillSwitch();
             Log.d(TAG, "Service is now active");
             service.setOwner(this);
-            backendState = BackendState.SERVICE_ACTIVE;
+            backendStatus = BackendStatus.ServiceActive.INSTANCE;
         } catch (final TimeoutException | ExecutionException | InterruptedException ignored) {
-            backendState = BackendState.INACTIVE;
+            backendStatus = BackendStatus.Inactive.INSTANCE;
         }
     }
 
     private void activateKillSwitch(Collection<String> allowedIps) {
-        if(backendState == BackendState.KILL_SWITCH_ACTIVE && allowedIps.equals(this.allowedIps)) return;
-        if (!vpnService.isDone() || !this.allowedIps.equals(allowedIps)) {
-            activateService();
-        }
         try {
+            if (!vpnService.isDone()) {
+                activateService();
+            }
             VpnService service = vpnService.get(0, TimeUnit.MILLISECONDS);
-            this.allowedIps = allowedIps;
             service.activateKillSwitch(allowedIps);
+            backendStatus = new BackendStatus.KillSwitchActive(allowedIps);
         } catch (final TimeoutException | ExecutionException | InterruptedException ignored) {
-            backendState = BackendState.INACTIVE;
+            backendStatus = BackendStatus.Inactive.INSTANCE;
         }
     }
 
@@ -491,7 +491,7 @@ public final class GoBackend implements Backend {
                     owner.currentTunnel = null;
                     owner.currentTunnelHandle = -1;
                     owner.currentConfig = null;
-                    owner.backendState = BackendState.INACTIVE;
+                    owner.backendStatus = BackendStatus.Inactive.INSTANCE;
                     tunnel.onStateChange(State.DOWN);
                 }
 
@@ -501,7 +501,6 @@ public final class GoBackend implements Backend {
         }
 
         void activateKillSwitch(Collection<String> allowedIps) {
-
             Builder builder = new Builder();
             Log.d(TAG, "Starting kill switch with allowedIps: " + allowedIps);
             builder.setSession("KillSwitchSession")
@@ -517,10 +516,10 @@ public final class GoBackend implements Backend {
             });
             builder.addRoute("::", 0);
 
-
             try {
+                if(mInterface != null) mInterface.close();
                 mInterface = builder.establish();
-                if(owner != null) owner.backendState = BackendState.KILL_SWITCH_ACTIVE;
+                if(owner != null) owner.backendStatus = new BackendStatus.KillSwitchActive(allowedIps);
             } catch (Exception ignored) {
                 Log.e(TAG, "Failed to start kill switch");
             }
@@ -532,7 +531,7 @@ public final class GoBackend implements Backend {
                     mInterface.close();
                     Log.d(TAG, "FD closed");
                     mInterface = null;
-                    if(owner != null) owner.backendState = BackendState.SERVICE_ACTIVE;
+                    if(owner != null) owner.backendStatus = BackendStatus.ServiceActive.INSTANCE;
                 } catch (IOException e) {
                     Log.e(TAG, "Failed to stop kill switch");
                 }
@@ -552,7 +551,7 @@ public final class GoBackend implements Backend {
 
         public void setOwner(final GoBackend owner) {
             this.owner = owner;
-            owner.backendState = BackendState.SERVICE_ACTIVE;
+            owner.backendStatus = BackendStatus.ServiceActive.INSTANCE;
         }
     }
 }
