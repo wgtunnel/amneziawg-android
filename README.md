@@ -18,7 +18,7 @@ repositories {
 build.gradle.kts
 ```
 dependencies {
-    implementation("com.zaneschepke:amneziawg-android:1.2.0")
+    implementation("com.zaneschepke:amneziawg-android:1.6.1")
 }
 ```
 
@@ -31,9 +31,3 @@ $ ./gradlew assembleRelease
 ```
 
 macOS users may need [flock(1)](https://github.com/discoteq/flock).
-
-## Publish
-
-```sh
- ./gradlew publishAllPublicationsToCentralPortal  
-```
