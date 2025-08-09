@@ -67,6 +67,8 @@ dependencies {
     implementation(libs.androidx.collection)
     compileOnly(libs.jsr305)
     testImplementation(libs.junit)
+
+    implementation(libs.relinker)
 }
 
 publishing {

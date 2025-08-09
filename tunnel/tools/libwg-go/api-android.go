@@ -73,7 +73,7 @@ func init() {
 }
 
 //export awgTurnOn
-func awgTurnOn(interfaceName string, tunFd int32, settings string) int32 {
+func awgTurnOn(interfaceName string, tunFd int32, settings string, pkgName string) int32 {
 	tag := cstring("AmneziaWG/" + interfaceName)
 	logger := &device.Logger{
 		Verbosef: AndroidLogger{level: C.ANDROID_LOG_DEBUG, tag: tag}.Printf,
@@ -100,11 +100,13 @@ func awgTurnOn(interfaceName string, tunFd int32, settings string) int32 {
 
 	var uapi net.Listener
 
-	uapiFile, err := ipc.UAPIOpen(name)
+	logger.Verbosef("Got app package name %v", pkgName)
+	uapiFile, err := ipc.UAPIOpen(pkgName, name)
+	logger.Verbosef("Got here")
 	if err != nil {
 		logger.Errorf("UAPIOpen: %v", err)
 	} else {
-		uapi, err = ipc.UAPIListen(name, uapiFile)
+		uapi, err = ipc.UAPIListen(pkgName, name, uapiFile) // pkgName as rootdir, name as interface
 		if err != nil {
 			uapiFile.Close()
 			logger.Errorf("UAPIListen: %v", err)
