@@ -13,6 +13,7 @@ import android.system.OsConstants;
 import android.util.Log;
 import androidx.annotation.Nullable;
 import androidx.collection.ArraySet;
+import com.getkeepsafe.relinker.ReLinker;
 import org.amnezia.awg.backend.BackendException.Reason;
 import org.amnezia.awg.backend.Tunnel.State;
 import org.amnezia.awg.config.Config;
@@ -22,7 +23,6 @@ import org.amnezia.awg.config.Peer;
 import org.amnezia.awg.crypto.Key;
 import org.amnezia.awg.crypto.KeyFormatException;
 import org.amnezia.awg.util.NonNullForAll;
-import org.amnezia.awg.util.SharedLibraryLoader;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -57,7 +57,7 @@ public final class GoBackend implements Backend {
      * @param context An Android {@link Context}
      */
     public GoBackend(final Context context, final TunnelActionHandler tunnelActionHandler) {
-        SharedLibraryLoader.loadSharedLibrary(context, "am-go");
+        ReLinker.loadLibrary(context, "am-go");
         this.context = context;
         this.tunnelActionHandler = tunnelActionHandler;
     }
@@ -392,7 +392,9 @@ public final class GoBackend implements Backend {
                     throw new BackendException(Reason.TUN_CREATION_ERROR);
                 Log.d(TAG, "Go backend " + awgVersion());
                 tunnelActionHandler.runPreUp(config.getInterface().getPreUp());
-                currentTunnelHandle = awgTurnOn(tunnel.getName(), tun.detachFd(), goConfig);
+                String packageName = context.getPackageName();
+                Log.d(TAG, "App package name " + packageName);
+                currentTunnelHandle = awgTurnOn(tunnel.getName(), tun.detachFd(), goConfig, packageName);
                 tunnelActionHandler.runPostUp(config.getInterface().getPostUp());
             }
             if (currentTunnelHandle < 0)
