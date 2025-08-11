@@ -31,7 +31,7 @@ jobs:
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: '26.1.10909125'
+          ndk-version: r26d
           add-to-path: false
 
       - name: Set up Go
