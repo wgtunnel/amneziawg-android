@@ -44,11 +44,9 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Decode GPG secret keyring
+      - name: Decode signing key ring
         run: |
-          echo "$SIGNING_KEY_BASE64" | base64 -d > secring.gpg
-        env:
-          SIGNING_KEY_BASE64: ${{ secrets.GPG_SIGNING_KEYRING }}
+          echo "${{ secrets.GPG_SIGNING_KEYRING }}" | base64 -d > /home/runner/.gnupg/secring.gpg
 
       - name: Generate local.properties
         run: |
@@ -57,7 +55,7 @@ jobs:
           PASSWORD=${{ secrets.GPG_PASS }}
           MAVEN_CENTRAL_USER=${{ secrets.MAVEN_CENTRAL_USER }}
           MAVEN_CENTRAL_PASS=${{ secrets.MAVEN_CENTRAL_PASS }}
-          SECRET_KEY_RING_FILE=$(pwd)/secring.gpg
+          SECRET_KEY_RING_FILE=/home/runner/.gnupg/secring.gpg
           EOF
 
       - name: Gradle clean
