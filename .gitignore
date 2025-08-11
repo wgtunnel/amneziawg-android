@@ -1,8 +1,4 @@
 /.gradle/
-/.idea/*.xml
-/.idea/caches/
-/.idea/dictionaries/
-/.idea/libraries/
 /captures/
 /local.properties
 .DS_Store
@@ -18,3 +14,5 @@ gradlew.bat
 maint/
 /buildSrc/.gradle/
 /rs/
+.idea
+.kotlin

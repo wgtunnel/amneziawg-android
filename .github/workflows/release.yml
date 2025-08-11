@@ -1,0 +1,78 @@
+name: release
+permissions:
+  contents: write
+  packages: write
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: release-package
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Decode GPG secret keyring
+        run: |
+          echo "$SIGNING_KEY_BASE64" | base64 -d > secring.gpg
+        env:
+          SIGNING_KEY_BASE64: ${{ secrets.GPG_SIGNING_KEYRING }}
+
+      - name: Generate local.properties
+        run: |
+          cat <<EOF > local.properties
+          KEY_ID=${{ secrets.MAVEN_SIGNING_KEY_ID }}
+          PASSWORD=${{ secrets.GPG_PASS }}
+          MAVEN_CENTRAL_USER=${{ secrets.MAVEN_CENTRAL_USER }}
+          MAVEN_CENTRAL_PASS=${{ secrets.MAVEN_CENTRAL_PASS }}
+          SECRET_KEY_RING_FILE=$(pwd)/secring.gpg
+          EOF
+
+      - name: Gradle clean
+        run: ./gradlew clean
+
+      - name: Publish to Maven Central
+        run: ./gradlew publishAggregationToCentralPortal
+
+      # Extract tag version (e.g. v1.6.1)
+      - name: Extract version from tag
+        id: vars
+        run: echo "version=${GITHUB_REF##*/}" >> "$GITHUB_OUTPUT"
+
+      # Update README.md with new version
+      - name: Update version in README.md
+        run: |
+          VERSION=${{ steps.vars.outputs.version }}
+          VERSION=${VERSION#v}
+          sed -i "s/implementation(\"com.zaneschepke:amneziawg-android:[^\"]*\")/implementation(\"com.zaneschepke:amneziawg-android:$VERSION\")/" README.md
+
+      # Commit and push README update
+      - name: Commit README update
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git commit -am "Update README.md to version ${{ steps.vars.outputs.version }}"
+          git push
+
+      # Create GitHub Release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: "Published library version ${{ github.ref_name }} to Maven Central."
