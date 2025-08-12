@@ -8,8 +8,8 @@ plugins {
 
 nmcpAggregation {
     centralPortal {
-        username = getLocalProperty("MAVEN_CENTRAL_USER")
-        password = getLocalProperty("MAVEN_CENTRAL_PASS")
+        username = getLocalProperty("MAVEN_CENTRAL_USER") ?: System.getenv("MAVEN_CENTRAL_USER")
+        password = getLocalProperty("MAVEN_CENTRAL_PASS") ?: System.getenv("MAVEN_CENTRAL_PASS")
         // publish manually from the portal
         publishingType = "USER_MANAGED"
         // or if you want to publish automatically
