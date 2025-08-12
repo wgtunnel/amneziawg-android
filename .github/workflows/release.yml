@@ -14,6 +14,13 @@ jobs:
     name: release-package
     runs-on: ubuntu-latest
 
+    env:
+      KEY_ID: ${{ secrets.KEY_ID }}
+      SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
+      PASSWORD: ${{ secrets.GPG_PASS }}
+      MAVEN_CENTRAL_USER: ${{ secrets.MAVEN_CENTRAL_USER }}
+      MAVEN_CENTRAL_PASS: ${{ secrets.MAVEN_CENTRAL_PASS }}
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,16 +50,6 @@ jobs:
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-
-      - name: Generate local.properties
-        run: |
-          cat <<EOF > local.properties
-          KEY_ID=${{ secrets.MAVEN_SIGNING_KEY_ID }}
-          PASSWORD=${{ secrets.GPG_PASS }}
-          MAVEN_CENTRAL_USER=${{ secrets.MAVEN_CENTRAL_USER }}
-          MAVEN_CENTRAL_PASS=${{ secrets.MAVEN_CENTRAL_PASS }}
-          SECRET_KEY=${{ secrets.GPG_SECRET_KEY }}
-          EOF
 
       - name: Gradle clean
         run: ./gradlew clean
