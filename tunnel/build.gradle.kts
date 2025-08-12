@@ -115,7 +115,6 @@ publishing {
 
 signing {
     useInMemoryPgpKeys(
-        getLocalProperty("KEY_ID") ?: System.getenv("KEY_ID"),
         getLocalProperty("SECRET_KEY") ?: System.getenv("SECRET_KEY"),
         getLocalProperty("PASSWORD") ?: System.getenv("PASSWORD")
     )
