@@ -114,8 +114,10 @@ publishing {
 
 
 signing {
-    extra["signing.keyId"] = getLocalProperty("KEY_ID")
-    extra["signing.secretKeyRingFile"] = getLocalProperty("SECRET_KEY_RING_FILE")
-    extra["signing.password"] = getLocalProperty("PASSWORD")
+    useInMemoryPgpKeys(
+        getLocalProperty("KEY_ID"),
+        getLocalProperty("SECRET_KEY"),
+        getLocalProperty("PASSWORD")
+    )
     sign(publishing.publications)
 }
