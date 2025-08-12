@@ -69,14 +69,6 @@ jobs:
           VERSION=${VERSION#v}
           sed -i "s/implementation(\"com.zaneschepke:amneziawg-android:[^\"]*\")/implementation(\"com.zaneschepke:amneziawg-android:$VERSION\")/" README.md
 
-      # Commit and push README update
-      - name: Commit README update
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git commit -am "Update README.md to version ${{ steps.vars.outputs.version }}"
-          git push
-
       # Create GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
