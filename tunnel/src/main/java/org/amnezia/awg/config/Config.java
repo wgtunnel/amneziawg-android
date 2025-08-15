@@ -23,7 +23,8 @@ import java.util.Objects;
 
 /**
  * Represents the contents of a awg-quick configuration file, made up of one or more "Interface"
- * sections (combined together), and zero or more "Peer" sections (treated individually).
+ * sections (combined together), zero or more "Peer" sections (treated individually), and
+ * zero or more proxy sections added programmatically.
  * <p>
  * Instances of this class are immutable.
  */
@@ -31,15 +32,17 @@ import java.util.Objects;
 public final class Config {
     private final Interface interfaze;
     private final List<Peer> peers;
+    private final List<Proxy> proxies;
 
     private Config(final Builder builder) {
         interfaze = Objects.requireNonNull(builder.interfaze, "An [Interface] section is required");
         // Defensively copy to ensure immutability even if the Builder is reused.
         peers = List.copyOf(builder.peers);
+        proxies = List.copyOf(builder.proxies);
     }
 
     /**
-     * Parses an series of "Interface" and "Peer" sections into a {@code Config}. Throws
+     * Parses a series of "Interface" and "Peer" sections into a {@code Config}. Throws
      * {@link BadConfigException} if the input is not well-formed or contains data that cannot
      * be parsed.
      *
@@ -52,7 +55,7 @@ public final class Config {
     }
 
     /**
-     * Parses an series of "Interface" and "Peer" sections into a {@code Config}. Throws
+     * Parses a series of "Interface" and "Peer" sections into a {@code Config}. Throws
      * {@link BadConfigException} if the input is not well-formed or contains data that cannot
      * be parsed.
      *
@@ -115,7 +118,9 @@ public final class Config {
     public boolean equals(final Object obj) {
         if (!(obj instanceof Config other))
             return false;
-        return interfaze.equals(other.interfaze) && peers.equals(other.peers);
+        return interfaze.equals(other.interfaze)
+                && peers.equals(other.peers)
+                && proxies.equals(other.proxies);
     }
 
     /**
@@ -136,38 +141,50 @@ public final class Config {
         return peers;
     }
 
+    /**
+     * Returns a list of the configuration's proxy sections.
+     *
+     * @return a list of {@link Proxy}s
+     */
+    public List<Proxy> getProxies() {
+        return proxies;
+    }
+
     @Override
     public int hashCode() {
-        return 31 * interfaze.hashCode() + peers.hashCode();
+        return Objects.hash(interfaze, peers, proxies);
     }
 
     /**
-     * Converts the {@code Config} into a string suitable for debugging purposes. The {@code Config}
-     * is identified by its interface's public key and the number of peers it has.
+     * Converts the {@code Config} into a string suitable for debugging purposes.
      *
      * @return a concise single-line identifier for the {@code Config}
      */
     @Override
     public String toString() {
-        return "(Config " + interfaze + " (" + peers.size() + " peers))";
+        return "(Config " + interfaze + " (" + peers.size() + " peers, " + proxies.size() + " proxies))";
     }
 
     /**
      * Converts the {@code Config} into a string suitable for use as a {@code awg-quick}
      * configuration file.
      *
-     * @return the {@code Config} represented as one [Interface] and zero or more [Peer] sections
+     * @return the {@code Config} represented as one [Interface], zero or more [Peer], and zero or
+     * more [Socks5] or [Http] sections
      */
     public String toAwgQuickString(final Boolean includeScripts) {
         final StringBuilder sb = new StringBuilder();
         sb.append("[Interface]\n").append(interfaze.toAwgQuickString(includeScripts));
         for (final Peer peer : peers)
             sb.append("\n[Peer]\n").append(peer.toAwgQuickString());
+        for (final Proxy proxy : proxies)
+            sb.append("\n").append(proxy.toQuickString());
         return sb.toString();
     }
 
     /**
      * Serializes the {@code Config} for use with the AmneziaWG cross-platform userspace API.
+     * Note: Proxy sections are not included in this format, as they are specific to awg-quick.
      *
      * @return the {@code Config} represented as a series of "key=value" lines
      */
@@ -180,11 +197,26 @@ public final class Config {
         return sb.toString();
     }
 
+    /**
+     * Returns a new Config instance with the specified proxies added to the existing ones.
+     *
+     * @param newProxies the proxies to add
+     * @return a new {@code Config} instance with the combined proxies
+     */
+    public Config withProxies(final Collection<Proxy> newProxies) {
+        final List<Proxy> combinedProxies = new ArrayList<>(proxies);
+        combinedProxies.addAll(newProxies);
+        return new Config.Builder()
+                .setInterface(interfaze)
+                .addPeers(peers)
+                .addProxies(combinedProxies)
+                .build();
+    }
+
     @SuppressWarnings("UnusedReturnValue")
     public static final class Builder {
-        // Defaults to an empty set.
         private final ArrayList<Peer> peers = new ArrayList<>();
-        // No default; must be provided before building.
+        private final ArrayList<Proxy> proxies = new ArrayList<>();
         @Nullable private Interface interfaze;
 
         public Builder addPeer(final Peer peer) {
@@ -194,6 +226,16 @@ public final class Config {
 
         public Builder addPeers(final Collection<Peer> peers) {
             this.peers.addAll(peers);
+            return this;
+        }
+
+        public Builder addProxy(final Proxy proxy) {
+            proxies.add(proxy);
+            return this;
+        }
+
+        public Builder addProxies(final Collection<Proxy> proxies) {
+            this.proxies.addAll(proxies);
             return this;
         }
 

@@ -72,13 +72,17 @@ func init() {
 	}()
 }
 
-//export awgTurnOn
-func awgTurnOn(interfaceName string, tunFd int32, settings string, pkgName string) int32 {
-	tag := cstring("AmneziaWG/" + interfaceName)
-	logger := &device.Logger{
+func newAndroidLogger(name string) *device.Logger {
+	tag := cstring("AmneziaWG/" + name)
+	return &device.Logger{
 		Verbosef: AndroidLogger{level: C.ANDROID_LOG_DEBUG, tag: tag}.Printf,
 		Errorf:   AndroidLogger{level: C.ANDROID_LOG_ERROR, tag: tag}.Printf,
 	}
+}
+
+//export awgTurnOn
+func awgTurnOn(interfaceName string, tunFd int32, settings string, pkgName string) int32 {
+	logger := newAndroidLogger(interfaceName)
 
 	tun, name, err := tun.CreateUnmonitoredTUNFromFD(int(tunFd))
 	if err != nil {

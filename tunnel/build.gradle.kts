@@ -69,6 +69,7 @@ dependencies {
     testImplementation(libs.junit)
 
     implementation(libs.relinker)
+    implementation(libs.androidx.collection)
 }
 
 publishing {

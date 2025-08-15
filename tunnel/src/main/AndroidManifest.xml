@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <application>
         <service
-            android:name="org.amnezia.awg.backend.GoBackend$VpnService"
+            android:name="org.amnezia.awg.backend.AbstractBackend$VpnService"
             android:permission="android.permission.BIND_VPN_SERVICE"
             android:exported="false">
             <intent-filter>

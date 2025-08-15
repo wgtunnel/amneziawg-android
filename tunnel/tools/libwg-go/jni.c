@@ -15,6 +15,9 @@ extern int awgGetSocketV6(int handle);
 extern char *awgGetConfig(int handle);
 extern char *awgVersion();
 
+extern void awgStartWireproxy(struct go_string config);
+extern void awgStopWireproxy();
+
 JNIEXPORT jint JNICALL Java_org_amnezia_awg_GoBackend_awgTurnOn(JNIEnv *env, jclass c, jstring ifname, jint tun_fd, jstring settings, jstring pkgname)
 {
 	const char *ifname_str = (*env)->GetStringUTFChars(env, ifname, 0);
@@ -74,4 +77,20 @@ JNIEXPORT jstring JNICALL Java_org_amnezia_awg_GoBackend_awgVersion(JNIEnv *env,
 	ret = (*env)->NewStringUTF(env, version);
 	free(version);
 	return ret;
+}
+
+JNIEXPORT void JNICALL Java_org_amnezia_awg_ProxyGoBackend_awgStartWireproxy(JNIEnv *env, jclass c, jstring config)
+{
+	const char *config_str = (*env)->GetStringUTFChars(env, config, 0);
+	size_t config_len = (*env)->GetStringUTFLength(env, config);
+	awgStartWireproxy((struct go_string){
+		.str = config_str,
+		.n = config_len
+	});
+	(*env)->ReleaseStringUTFChars(env, config, config_str);
+}
+
+JNIEXPORT void JNICALL Java_org_amnezia_awg_ProxyGoBackend_awgStopWireproxy(JNIEnv *env, jclass c)
+{
+	awgStopWireproxy();
 }
