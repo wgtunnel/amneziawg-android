@@ -3,159 +3,127 @@
  * Copyright © 2017-2022 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  */
 
-package main
+package vpn
 
-// #cgo LDFLAGS: -llog
-// #include <android/log.h>
 import "C"
-
 import (
-	"fmt"
-	"math"
 	"net"
-	"os"
-	"os/signal"
-	"runtime"
 	"runtime/debug"
 	"strings"
-	"unsafe"
 
+	"github.com/amnezia-vpn/amneziawg-android/shared"
+	"github.com/amnezia-vpn/amneziawg-android/util"
 	"github.com/amnezia-vpn/amneziawg-go/conn"
 	"github.com/amnezia-vpn/amneziawg-go/device"
 	"github.com/amnezia-vpn/amneziawg-go/ipc"
 	"github.com/amnezia-vpn/amneziawg-go/tun"
+	wireproxyawg "github.com/artem-russkikh/wireproxy-awg"
 	"golang.org/x/sys/unix"
 )
-
-type AndroidLogger struct {
-	level C.int
-	tag   *C.char
-}
-
-func cstring(s string) *C.char {
-	b, err := unix.BytePtrFromString(s)
-	if err != nil {
-		b := [1]C.char{}
-		return &b[0]
-	}
-	return (*C.char)(unsafe.Pointer(b))
-}
-
-func (l AndroidLogger) Printf(format string, args ...interface{}) {
-	C.__android_log_write(l.level, l.tag, cstring(fmt.Sprintf(format, args...)))
-}
 
 type TunnelHandle struct {
 	device *device.Device
 	uapi   net.Listener
 }
 
-var tunnelHandles map[int32]TunnelHandle
+var(
+	tag string
+	tunnelHandles map[int32]TunnelHandle
+)
 
 func init() {
+	tag = "AwgVPN"
 	tunnelHandles = make(map[int32]TunnelHandle)
-	signals := make(chan os.Signal)
-	signal.Notify(signals, unix.SIGUSR2)
-	go func() {
-		buf := make([]byte, os.Getpagesize())
-		for {
-			select {
-			case <-signals:
-				n := runtime.Stack(buf, true)
-				if n == len(buf) {
-					n--
-				}
-				buf[n] = 0
-				C.__android_log_write(C.ANDROID_LOG_ERROR, cstring("AmneziaWG/Stacktrace"), (*C.char)(unsafe.Pointer(&buf[0])))
-			}
-		}
-	}()
-}
-
-func newAndroidLogger(name string) *device.Logger {
-	tag := cstring("AmneziaWG/" + name)
-	return &device.Logger{
-		Verbosef: AndroidLogger{level: C.ANDROID_LOG_DEBUG, tag: tag}.Printf,
-		Errorf:   AndroidLogger{level: C.ANDROID_LOG_ERROR, tag: tag}.Printf,
-	}
 }
 
 //export awgTurnOn
 func awgTurnOn(interfaceName string, tunFd int32, settings string, pkgName string) int32 {
-	logger := newAndroidLogger(interfaceName)
+	tunnel, name, err := tun.CreateUnmonitoredTUNFromFD(int(tunFd))
 
-	tun, name, err := tun.CreateUnmonitoredTUNFromFD(int(tunFd))
 	if err != nil {
 		unix.Close(int(tunFd))
-		logger.Errorf("CreateUnmonitoredTUNFromFD: %v", err)
+		shared.LogError(tag,"CreateUnmonitoredTUNFromFD: %v", err)
 		return -1
 	}
 
-	logger.Verbosef("Attaching to interface %v", name)
-	device := device.NewDevice(tun, conn.NewStdNetBind(), logger)
-
-	err = device.IpcSet(settings)
+	conf, err := wireproxyawg.ParseConfigString(settings)
 	if err != nil {
+		shared.LogError(tag,"Invalid config file", err)
 		unix.Close(int(tunFd))
-		logger.Errorf("IpcSet: %v", err)
 		return -1
 	}
-	device.DisableSomeRoamingForBrokenMobileSemantics()
+
+	shared.LogDebug(tag,"Creating device with domain blocking enabled: %v", conf.Device.DomainBlockingEnabled)
+
+	tunDevice := device.NewDevice(tunnel, conn.NewStdNetBind(), shared.NewLogger("Tun/"+interfaceName), conf.Device.DomainBlockingEnabled, conf.Device.BlockedDomains)
+
+	ipcRequest, err := wireproxyawg.CreateIPCRequest(conf.Device)
+	if err != nil {
+		shared.LogError(tag, "CreateIPCRequest: %v", err)
+		unix.Close(int(tunFd))
+		return -1
+	}
+
+	err = tunDevice.IpcSet(ipcRequest.IpcRequest)
+	if err != nil {
+		unix.Close(int(tunFd))
+		shared.LogError(tag, "IpcSet: %v", err)
+		return -1
+	}
+	tunDevice.DisableSomeRoamingForBrokenMobileSemantics()
 
 	var uapi net.Listener
 
-	logger.Verbosef("Got app package name %v", pkgName)
 	uapiFile, err := ipc.UAPIOpen(pkgName, name)
-	logger.Verbosef("Got here")
+
 	if err != nil {
-		logger.Errorf("UAPIOpen: %v", err)
+		shared.LogError(tag, "UAPIOpen: %v", err)
 	} else {
 		uapi, err = ipc.UAPIListen(pkgName, name, uapiFile) // pkgName as rootdir, name as interface
 		if err != nil {
 			uapiFile.Close()
-			logger.Errorf("UAPIListen: %v", err)
+			shared.LogError(tag, "UAPIListen: %v", err)
 		} else {
 			go func() {
 				for {
-					conn, err := uapi.Accept()
+					connection, err := uapi.Accept()
 					if err != nil {
 						return
 					}
-					go device.IpcHandle(conn)
+					go tunDevice.IpcHandle(connection)
 				}
 			}()
 		}
 	}
 
-	err = device.Up()
+	err = tunDevice.Up()
 	if err != nil {
-		logger.Errorf("Unable to bring up device: %v", err)
+		shared.LogError(tag,"Unable to bring up device: %v", err)
 		uapiFile.Close()
-		device.Close()
+		tunDevice.Close()
 		return -1
 	}
-	logger.Verbosef("Device started")
+	shared.LogDebug(tag, "Device started")
 
-	var i int32
-	for i = 0; i < math.MaxInt32; i++ {
-		if _, exists := tunnelHandles[i]; !exists {
-			break
-		}
-	}
-	if i == math.MaxInt32 {
-		logger.Errorf("Unable to find empty handle")
+	handle, err2 := util.GenerateHandle(tunnelHandles)
+
+	if err2 != nil {
+		shared.LogError(tag, "Unable to find empty handle", err2)
 		uapiFile.Close()
-		device.Close()
+		tunDevice.Close()
 		return -1
 	}
-	tunnelHandles[i] = TunnelHandle{device: device, uapi: uapi}
-	return i
+
+	tunnelHandles[handle] = TunnelHandle{device: tunDevice, uapi: uapi}
+
+	return handle
 }
 
 //export awgTurnOff
 func awgTurnOff(tunnelHandle int32) {
 	handle, ok := tunnelHandles[tunnelHandle]
 	if !ok {
+		shared.LogError(tag, "Tunnel is not up")
 		return
 	}
 	delete(tunnelHandles, tunnelHandle)
@@ -229,5 +197,3 @@ func awgVersion() *C.char {
 	}
 	return C.CString("unknown")
 }
-
-func main() {}

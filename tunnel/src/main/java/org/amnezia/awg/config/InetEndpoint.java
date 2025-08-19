@@ -5,7 +5,9 @@
 
 package org.amnezia.awg.config;
 
+import android.content.Context;
 import android.util.Log;
+import okhttp3.internal.platform.AndroidPlatform;
 import org.amnezia.awg.util.NonNullForAll;
 
 import java.net.*;
@@ -16,6 +18,12 @@ import java.util.regex.Pattern;
 
 import androidx.annotation.Nullable;
 
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.dnsoverhttps.DnsOverHttps;
+import java.util.List;
+import java.io.IOException;
+import javax.net.SocketFactory;
 
 /**
  * An external endpoint (host and port) used to connect to an AmneziaWG {@link Peer}.
@@ -30,6 +38,23 @@ public final class InetEndpoint {
 
     private static final long DEFAULT_TTL_SECONDS = 300;
     private static final long NEGATIVE_TTL_SECONDS = 30;
+
+    private static boolean useDoH = false; // User setting, default false
+    private static String preferredDoHUrl = "https://1.1.1.1/dns-query";
+
+    private static Resolver currentResolver = new SystemResolver();
+
+    public static void setUseDoH(boolean use) {
+        useDoH = use;
+    }
+
+    public static void setPreferredDoHUrl(String url) {
+        preferredDoHUrl = url;
+    }
+
+    public static void setResolver(Resolver resolver) {
+        currentResolver = resolver;
+    }
 
     private final String host;
     private final boolean isResolved;
@@ -58,7 +83,7 @@ public final class InetEndpoint {
             throw new ParseException(InetEndpoint.class, endpoint, "Missing/invalid port number");
         try {
             InetAddresses.parse(uri.getHost());
-            // Parsing ths host as a numeric address worked, so we don't need to do DNS lookups.
+            // Parsing the host as a numeric address worked, so we don't need to do DNS lookups.
             return new InetEndpoint(uri.getHost(), true, uri.getPort());
         } catch (final ParseException ignored) {
             // Failed to parse the host as a numeric address, so it must be a DNS hostname/FQDN.
@@ -89,6 +114,7 @@ public final class InetEndpoint {
      * @return the resolved endpoint, or {@link Optional#empty()}
      */
     public Optional<InetEndpoint> getResolved(Boolean preferIpv4) {
+        Log.d(TAG, "Resolving with ipv4 preferred: " + preferIpv4 + "and resolver: " + currentResolver.getClass().getSimpleName());
         if (isResolved) return Optional.of(this);
         if (Duration.between(lastResolution, Instant.now()).getSeconds() <= DEFAULT_TTL_SECONDS) {
             synchronized (lock) {
@@ -103,9 +129,9 @@ public final class InetEndpoint {
                 return Optional.ofNullable(resolved);
             }
             try {
-                final InetAddress[] candidates = InetAddress.getAllByName(host);
+                final InetAddress[] candidates = currentResolver.resolve(host);
                 if (candidates == null || candidates.length == 0) {
-                    Log.w(TAG,"No addresses resolved for host: " + host);
+                    Log.w(TAG, "No addresses resolved for host: " + host);
                     lastFailedResolution = Instant.now();
                     resolved = null;
                     return Optional.empty();
@@ -122,7 +148,7 @@ public final class InetEndpoint {
                 resolved = new InetEndpoint(address.getHostAddress(), true, port);
                 lastResolution = Instant.now();
             } catch (final UnknownHostException e) {
-                Log.w(TAG,"Failed to resolve host " + host + ": " + e.getMessage());
+                Log.w(TAG, "Failed to resolve host " + host + ": " + e.getMessage());
                 lastFailedResolution = Instant.now();
                 resolved = null;
             }
@@ -140,4 +166,38 @@ public final class InetEndpoint {
         final boolean isBareIpv6 = isResolved && BARE_IPV6.matcher(host).matches();
         return (isBareIpv6 ? '[' + host + ']' : host) + ':' + port;
     }
+
+    interface Resolver {
+        InetAddress[] resolve(String host) throws UnknownHostException;
+    }
+
+    public static class SystemResolver implements Resolver {
+        @Override
+        public InetAddress[] resolve(String host) throws UnknownHostException {
+            return InetAddress.getAllByName(host);
+        }
+    }
+
+    public record DoHResolver(Optional<String> dohUrl, Optional<SocketFactory> socketFactory) implements Resolver {
+        @Override
+            public InetAddress[] resolve(String host) throws UnknownHostException {
+            Log.i(TAG, "Using DoH URL: " + dohUrl.orElse(preferredDoHUrl));
+            Log.i(TAG, "SocketFactory in use: " + (socketFactory.map(factory -> factory.getClass().getSimpleName()).orElse("none")));
+
+            OkHttpClient.Builder builder = new OkHttpClient.Builder();
+            socketFactory.ifPresent(builder::socketFactory);
+            OkHttpClient client = builder
+                    .build();
+            String url = dohUrl.orElse(preferredDoHUrl);
+                DnsOverHttps doh = new DnsOverHttps.Builder()
+                        .client(client)
+                        .url(HttpUrl.parse(url)).build();
+                try {
+                    List<InetAddress> addresses = doh.lookup(host);
+                    return addresses.toArray(new InetAddress[0]);
+                } catch (IOException e) {
+                    throw new UnknownHostException(e.getMessage());
+                }
+            }
+        }
 }

@@ -10,6 +10,7 @@ import androidx.annotation.Nullable;
 import org.amnezia.awg.config.BadConfigException.Location;
 import org.amnezia.awg.config.BadConfigException.Reason;
 import org.amnezia.awg.config.BadConfigException.Section;
+import org.amnezia.awg.config.proxy.Proxy;
 import org.amnezia.awg.util.NonNullForAll;
 
 import java.io.BufferedReader;
@@ -34,11 +35,14 @@ public final class Config {
     private final List<Peer> peers;
     private final List<Proxy> proxies;
 
+    @Nullable private final DnsSettings dsSettings;
+
     private Config(final Builder builder) {
         interfaze = Objects.requireNonNull(builder.interfaze, "An [Interface] section is required");
         // Defensively copy to ensure immutability even if the Builder is reused.
         peers = List.copyOf(builder.peers);
         proxies = List.copyOf(builder.proxies);
+        this.dsSettings = builder.dnsSettings;
     }
 
     /**
@@ -150,6 +154,11 @@ public final class Config {
         return proxies;
     }
 
+    @Nullable
+    public DnsSettings getDnsSettings() {
+        return dsSettings;
+    }
+
     @Override
     public int hashCode() {
         return Objects.hash(interfaze, peers, proxies);
@@ -172,13 +181,36 @@ public final class Config {
      * @return the {@code Config} represented as one [Interface], zero or more [Peer], and zero or
      * more [Socks5] or [Http] sections
      */
-    public String toAwgQuickString(final Boolean includeScripts) {
+    public String toAwgQuickString(final Boolean includeScripts, final  Boolean includeProxies) {
         final StringBuilder sb = new StringBuilder();
         sb.append("[Interface]\n").append(interfaze.toAwgQuickString(includeScripts));
-        for (final Peer peer : peers)
-            sb.append("\n[Peer]\n").append(peer.toAwgQuickString());
-        for (final Proxy proxy : proxies)
-            sb.append("\n").append(proxy.toQuickString());
+        for (final Peer peer : peers) {
+            sb.append("\n[Peer]\n").append( peer.toAwgQuickString());
+        }
+        if (includeProxies) {
+            for (final Proxy proxy : proxies)
+                sb.append("\n").append(proxy.toQuickString());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Converts the {@code Config} into a string suitable for use as a {@code awg-quick}
+     * configuration file with resolved endpoints.
+     *
+     * @return the {@code Config} represented as one [Interface], zero or more [Peer], and zero or
+     * more [Socks5] or [Http] sections
+     */
+    public String toAwgQuickStringResolved(final Boolean includeScripts, final Boolean includeProxies, final Boolean preferIpv4) {
+        final StringBuilder sb = new StringBuilder();
+        sb.append("[Interface]\n").append(interfaze.toAwgQuickString(includeScripts));
+        for (final Peer peer : peers) {
+            sb.append("\n[Peer]\n").append( peer.toAwgQuickStringResolved(preferIpv4));
+        }
+        if (includeProxies) {
+            for (final Proxy proxy : proxies)
+                sb.append("\n").append(proxy.toQuickString());
+        }
         return sb.toString();
     }
 
@@ -197,21 +229,6 @@ public final class Config {
         return sb.toString();
     }
 
-    /**
-     * Returns a new Config instance with the specified proxies added to the existing ones.
-     *
-     * @param newProxies the proxies to add
-     * @return a new {@code Config} instance with the combined proxies
-     */
-    public Config withProxies(final Collection<Proxy> newProxies) {
-        final List<Proxy> combinedProxies = new ArrayList<>(proxies);
-        combinedProxies.addAll(newProxies);
-        return new Config.Builder()
-                .setInterface(interfaze)
-                .addPeers(peers)
-                .addProxies(combinedProxies)
-                .build();
-    }
 
     @SuppressWarnings("UnusedReturnValue")
     public static final class Builder {
@@ -219,8 +236,15 @@ public final class Config {
         private final ArrayList<Proxy> proxies = new ArrayList<>();
         @Nullable private Interface interfaze;
 
+        @Nullable private DnsSettings dnsSettings;
+
         public Builder addPeer(final Peer peer) {
             peers.add(peer);
+            return this;
+        }
+
+        public Builder setDnsSettings(@Nullable final DnsSettings dnsSettings) {
+            this.dnsSettings = dnsSettings;
             return this;
         }
 

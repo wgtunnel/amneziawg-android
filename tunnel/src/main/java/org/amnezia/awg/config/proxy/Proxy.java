@@ -1,4 +1,4 @@
-package org.amnezia.awg.config;
+package org.amnezia.awg.config.proxy;
 
 import androidx.annotation.Nullable;
 import java.util.regex.Pattern;
@@ -51,12 +51,11 @@ public abstract class Proxy {
                 sb.append("Username = ").append(username).append("\n");
             }
             if (password != null) {
-                sb.append("# Avoid using spaces in the password field\n");
                 sb.append("Password = ").append(password).append("\n");
             }
         }
         return sb.toString();
     }
 
-    abstract String toQuickString();
+    public abstract String toQuickString();
 }

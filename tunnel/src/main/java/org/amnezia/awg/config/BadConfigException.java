@@ -68,6 +68,7 @@ public class BadConfigException extends Exception {
     public enum Location {
         TOP_LEVEL(""),
         ADDRESS("Address"),
+        ITIME("ITime"),
         ALLOWED_IPS("AllowedIPs"),
         DNS("DNS"),
         ENDPOINT("Endpoint"),

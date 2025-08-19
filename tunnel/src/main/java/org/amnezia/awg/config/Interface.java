@@ -52,6 +52,11 @@ public final class Interface {
     private final Optional<Integer> junkPacketMaxSize;
     private final Optional<Integer> initPacketJunkSize;
     private final Optional<Integer> responsePacketJunkSize;
+    private final Optional<Long> initPacketMagicHeader;
+    private final Optional<Long> responsePacketMagicHeader;
+    private final Optional<Long> underloadPacketMagicHeader;
+    private final Optional<Long> transportPacketMagicHeader;
+    private final Optional<Boolean> domainBlockingEnabled;
     private final List<String> preUp;
     private final List<String> postUp;
     private final List<String> preDown;
@@ -67,6 +72,15 @@ public final class Interface {
     private final Optional<String> specialJunkI3;
     private final Optional<String> specialJunkI4;
     private final Optional<String> specialJunkI5;
+
+    public enum DnsProtocol {
+        PLAIN, DOH, DOT;
+
+        @Override
+        public String toString() {
+            return name().toLowerCase(Locale.ENGLISH);
+        }
+    }
 
     private Interface(final Builder builder) {
         // Defensively copy to ensure immutability even if the Builder is reused.
@@ -89,10 +103,11 @@ public final class Interface {
         responsePacketMagicHeader = builder.responsePacketMagicHeader;
         underloadPacketMagicHeader = builder.underloadPacketMagicHeader;
         transportPacketMagicHeader = builder.transportPacketMagicHeader;
-        preUp = Collections.unmodifiableList(new ArrayList<>(builder.preUp));
-        postUp = Collections.unmodifiableList(new ArrayList<>(builder.postUp));
-        preDown = Collections.unmodifiableList(new ArrayList<>(builder.preDown));
-        postDown = Collections.unmodifiableList(new ArrayList<>(builder.postDown));
+        domainBlockingEnabled = builder.domainBlockingEnabled;
+        preUp = List.copyOf(builder.preUp);
+        postUp = List.copyOf(builder.postUp);
+        preDown = List.copyOf(builder.preDown);
+        postDown = List.copyOf(builder.postDown);
         specialJunkI1 = builder.specialJunkI1;
         specialJunkI2 = builder.specialJunkI2;
         specialJunkI3 = builder.specialJunkI3;
@@ -120,6 +135,9 @@ public final class Interface {
                     break;
                 case "dns":
                     builder.parseDnsServers(attribute.getValue());
+                    break;
+                case "domainblockingenabled":
+                    builder.parseDomainBlockingEnabled(attribute.getValue());
                     break;
                 case "excludedapplications":
                     builder.parseExcludedApplications(attribute.getValue());
@@ -206,9 +224,8 @@ public final class Interface {
 
     @Override
     public boolean equals(final Object obj) {
-        if (!(obj instanceof Interface))
+        if (!(obj instanceof Interface other))
             return false;
-        final Interface other = (Interface) obj;
         return addresses.equals(other.addresses)
                 && dnsServers.equals(other.dnsServers)
                 && dnsSearchDomains.equals(other.dnsSearchDomains)
@@ -228,6 +245,7 @@ public final class Interface {
                 && responsePacketMagicHeader.equals(other.responsePacketMagicHeader)
                 && underloadPacketMagicHeader.equals(other.underloadPacketMagicHeader)
                 && transportPacketMagicHeader.equals(other.transportPacketMagicHeader)
+                && domainBlockingEnabled.equals(other.domainBlockingEnabled)
                 && preUp.equals(other.preUp)
                 && postUp.equals(other.postUp)
                 && preDown.equals(other.preDown)
@@ -415,6 +433,15 @@ public final class Interface {
         return transportPacketMagicHeader;
     }
 
+    /**
+     * Returns whether domain blocking is enabled for the interface.
+     *
+     * @return the preferIpv6Dns, or {@code Optional.empty()} if none is configured
+     */
+    public Optional<Boolean> getDomainBlockingEnabled() {
+        return domainBlockingEnabled;
+    }
+
     public List<String> getPreUp() {
         return preUp;
     }
@@ -482,6 +509,7 @@ public final class Interface {
         int hash = 1;
         hash = 31 * hash + addresses.hashCode();
         hash = 31 * hash + dnsServers.hashCode();
+        hash = 31 * hash + dnsSearchDomains.hashCode();
         hash = 31 * hash + excludedApplications.hashCode();
         hash = 31 * hash + includedApplications.hashCode();
         hash = 31 * hash + keyPair.hashCode();
@@ -498,6 +526,7 @@ public final class Interface {
         hash = 31 * hash + responsePacketMagicHeader.hashCode();
         hash = 31 * hash + underloadPacketMagicHeader.hashCode();
         hash = 31 * hash + transportPacketMagicHeader.hashCode();
+        hash = 31 * hash + domainBlockingEnabled.hashCode();
         hash = 31 * hash + preUp.hashCode();
         hash = 31 * hash + postUp.hashCode();
         hash = 31 * hash + preDown.hashCode();
@@ -540,6 +569,7 @@ public final class Interface {
             dnsServerStrings.addAll(dnsSearchDomains);
             sb.append("DNS = ").append(Attribute.join(dnsServerStrings)).append('\n');
         }
+        domainBlockingEnabled.ifPresent(pref -> sb.append("DomainBlockingEnabled = ").append(pref).append('\n'));
         if (!excludedApplications.isEmpty())
             sb.append("ExcludedApplications = ").append(Attribute.join(excludedApplications)).append('\n');
         if (!includedApplications.isEmpty())
@@ -605,6 +635,52 @@ public final class Interface {
         return sb.toString();
     }
 
+    /**
+     * Creates a new Interface with updated DNS settings, copying all other fields from this instance.
+     *
+     * @param protocol the new DNS protocol
+     * @param additionalServers the new additional DNS servers
+     * @param preferIpv6 whether to prefer IPv6 DNS
+     * @return a new Interface with the updated DNS settings
+     */
+    public Interface withUpdatedDns(DnsProtocol protocol, Set<String> additionalServers, boolean preferIpv6) {
+        Builder builder = new Builder();
+        builder.addresses.addAll(this.addresses);
+        builder.dnsServers.addAll(this.dnsServers);
+        builder.dnsSearchDomains.addAll(this.dnsSearchDomains);
+        builder.excludedApplications.addAll(this.excludedApplications);
+        builder.includedApplications.addAll(this.includedApplications);
+        builder.keyPair = this.keyPair;
+        builder.listenPort = this.listenPort;
+        builder.mtu = this.mtu;
+        builder.junkPacketCount = this.junkPacketCount;
+        builder.junkPacketMinSize = this.junkPacketMinSize;
+        builder.junkPacketMaxSize = this.junkPacketMaxSize;
+        builder.initPacketJunkSize = this.initPacketJunkSize;
+        builder.responsePacketJunkSize = this.responsePacketJunkSize;
+        builder.initPacketMagicHeader = this.initPacketMagicHeader;
+        builder.responsePacketMagicHeader = this.responsePacketMagicHeader;
+        builder.underloadPacketMagicHeader = this.underloadPacketMagicHeader;
+        builder.transportPacketMagicHeader = this.transportPacketMagicHeader;
+        builder.cookieReplyPacketJunkSize = this.cookieReplyPacketJunkSize;
+        builder.transportPacketJunkSize = this.transportPacketJunkSize;
+        builder.specialJunkI1 = this.specialJunkI1;
+        builder.specialJunkI2 = this.specialJunkI2;
+        builder.specialJunkI3 = this.specialJunkI3;
+        builder.specialJunkI4 = this.specialJunkI4;
+        builder.specialJunkI5 = this.specialJunkI5;
+        builder.domainBlockingEnabled = Optional.of(preferIpv6);
+        builder.preUp.addAll(this.preUp);
+        builder.postUp.addAll(this.postUp);
+        builder.preDown.addAll(this.preDown);
+        builder.postDown.addAll(this.postDown);
+        try {
+            return builder.build();
+        } catch (BadConfigException e) {
+            throw new IllegalStateException("Failed to build updated Interface", e);
+        }
+    }
+
     @SuppressWarnings("UnusedReturnValue")
     public static final class Builder {
         // Defaults to an empty set.
@@ -640,13 +716,15 @@ public final class Interface {
         // Defaults to not present.
         private Optional<String> initPacketMagicHeader = Optional.empty();
         // Defaults to not present.
-        private List<String> preUp = new ArrayList<>();
+        private final List<String> preUp = new ArrayList<>();// Defaults to not present.
+        private final List<String> preUp = new ArrayList<>();
         // Defaults to empty list
-        private List<String> postUp = new ArrayList<>();
+        private final List<String> postUp = new ArrayList<>();
         // Defaults to empty list
-        private List<String> preDown = new ArrayList<>();
+        private final List<String> preDown = new ArrayList<>();
         // Defaults to empty list
-        private List<String> postDown = new ArrayList<>();
+        private final List<String> postDown = new ArrayList<>();
+        private Optional<Boolean> domainBlockingEnabled = Optional.empty();
         private Optional<String> responsePacketMagicHeader = Optional.empty();
         // Defaults to not present.
         private Optional<String> underloadPacketMagicHeader = Optional.empty();
@@ -748,6 +826,15 @@ public final class Interface {
                 return this;
             } catch (final ParseException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.DNS, e);
+            }
+        }
+
+        public Builder parseDomainBlockingEnabled(final String domainBlockingEnabled) throws BadConfigException {
+            try {
+                this.domainBlockingEnabled = Optional.of(Boolean.parseBoolean(domainBlockingEnabled));
+                return this;
+            } catch (Exception e) {
+                throw new BadConfigException(Section.INTERFACE, Location.TOP_LEVEL, Reason.INVALID_VALUE, domainBlockingEnabled);
             }
         }
 
