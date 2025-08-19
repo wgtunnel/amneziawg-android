@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-License-Identifier: Apache-2.0
 #
 # Copyright © 2017-2023 WireGuard LLC. All Rights Reserved.
 
@@ -17,17 +17,28 @@ add_executable(libam.so ${WG_SOURCES})
 target_include_directories(libam.so PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/amneziawg-tools/src/uapi/linux/" "${CMAKE_CURRENT_SOURCE_DIR}/amneziawg-tools/src/")
 target_compile_options(libam.so PUBLIC -std=gnu11 -include ${CMAKE_CURRENT_SOURCE_DIR}/ndk-compat/compat.h -DRUNSTATEDIR=\"/data/data/${ANDROID_PACKAGE_NAME}/cache\")
 
-add_custom_target(libam-go.so WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/libwg-go" COMMENT "Building amneziawg-go" VERBATIM COMMAND "${ANDROID_HOST_PREBUILTS}/bin/make"
-    ANDROID_ARCH_NAME=${ANDROID_ARCH_NAME}
-    ANDROID_PACKAGE_NAME=${ANDROID_PACKAGE_NAME}
-    GRADLE_USER_HOME=${GRADLE_USER_HOME}
-    CC=${CMAKE_C_COMPILER}
-    CFLAGS=${CMAKE_C_FLAGS}
-    LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
-    SYSROOT=${CMAKE_SYSROOT}
-    TARGET=${CMAKE_C_COMPILER_TARGET}
-    DESTDIR=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
-    BUILDDIR=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/../generated-src
+add_custom_target(libam-go.so
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/libwg-go"
+    COMMENT "Building amneziawg-go"
+    VERBATIM
+    COMMAND "${ANDROID_HOST_PREBUILTS}/bin/make"
+        ANDROID_ARCH_NAME=${ANDROID_ARCH_NAME}
+        ANDROID_PACKAGE_NAME=${ANDROID_PACKAGE_NAME}
+        GRADLE_USER_HOME=${GRADLE_USER_HOME}
+        CC=${CMAKE_C_COMPILER}
+        CFLAGS=${CMAKE_C_FLAGS}
+        LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+        SYSROOT=${CMAKE_SYSROOT}
+        TARGET=${CMAKE_C_COMPILER_TARGET}
+        DESTDIR=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
+        BUILDDIR=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/../generated-src
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/libwg-go/main.go
+            ${CMAKE_CURRENT_SOURCE_DIR}/libwg-go/shared/shared.go
+            ${CMAKE_CURRENT_SOURCE_DIR}/libwg-go/util/util.go
+            ${CMAKE_CURRENT_SOURCE_DIR}/libwg-go/vpn/vpn.go
+            ${CMAKE_CURRENT_SOURCE_DIR}/libwg-go/vpn/vpn_jni.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/libwg-go/proxy/proxy.go
+            ${CMAKE_CURRENT_SOURCE_DIR}/libwg-go/proxy/proxy_jni.c
 )
 
 # Strip unwanted ELF sections to prevent DT_FLAGS_1 warnings on old Android versions

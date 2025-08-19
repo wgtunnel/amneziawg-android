@@ -10,6 +10,7 @@ import org.amnezia.awg.util.NonNullForAll;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Set;
 
 import androidx.annotation.Nullable;
@@ -37,12 +38,11 @@ public interface Backend {
     Tunnel.State getState(Tunnel tunnel) throws Exception;
 
     /**
-     * Get the state of the backend.
+     * Get the active mode of the backend.
      *
-     * @return The state of the backend.
-     * @throws Exception Exception raised when retrieving tunnel's state.
+     * @return The mode of the backend.
      */
-    BackendStatus getBackendStatus() throws Exception;
+    BackendMode getBackendMode();
 
     /**
      * Get statistics about traffic and errors on this tunnel. If the tunnel is not running, the
@@ -76,44 +76,88 @@ public interface Backend {
     Tunnel.State setState(Tunnel tunnel, Tunnel.State state, @Nullable Config config) throws Exception;
 
 
-    BackendStatus setBackendStatus(BackendStatus backendStatus) throws Exception;
+    /**
+     * Set the mode of the backend.
+     * Primarily use to turn on kill switch for compatible backends.
+     *
+     * @return The mode of the backend.
+     * @throws Exception Exception raised when mode fails to engage.
+     */
+    BackendMode setBackendMode(BackendMode backendMode) throws Exception;
 
 
-    abstract class BackendStatus {
+    abstract class BackendMode {
 
-        private BackendStatus() {}
+        private BackendMode() {}
 
 
         /**
-         * Backend has a kill switch status and will engage kill switch when the tunnel goes down
+         * Backend is in kill switch mode, with optional allowIps exclusion meant for private IPs.
+         * This mode is only supported for {@link ProxyGoBackend}
          */
-        public static final class KillSwitchActive extends BackendStatus {
-            private final Collection<String> allowedIps;
+        public static final class KillSwitch extends BackendMode {
+            private final Set<String> allowedIps;
 
-            public KillSwitchActive(Collection<String> allowedIps) {
-                this.allowedIps = Collections.unmodifiableCollection(allowedIps);
+            /**
+             *  @param allowedIps should only be a list of private IPs, or it undermines this mode.
+             */
+            public KillSwitch(Set<String> allowedIps) {
+                this.allowedIps = Set.copyOf(allowedIps);
             }
 
-            public Collection<String> getAllowedIps() {
+            public Set<String> getAllowedIps() {
                 return allowedIps;
             }
+
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) return true;
+                if (o == null || getClass() != o.getClass()) return false;
+                KillSwitch that = (KillSwitch) o;
+                return Objects.equals(allowedIps, that.allowedIps);
+            }
+
+            @Override
+            public int hashCode() {
+                return Objects.hash(allowedIps);
+            }
+
+            @Override
+            public String toString() {
+                return "KillSwitch{allowedIps=" + allowedIps + "}";
+            }
         }
 
         /**
-         * Backend has already created a VpnService instance
+         * Backend mode is not in an active mode.
          */
-        public static final class ServiceActive extends BackendStatus {
-            public static final ServiceActive INSTANCE = new ServiceActive();
-            private ServiceActive() {}
-        }
-
-        /**
-         * Backend has no VpnService instance
-         */
-        public static final class Inactive extends BackendStatus {
+        public static final class Inactive extends BackendMode {
             public static final Inactive INSTANCE = new Inactive();
             private Inactive() {}
-        }
-    }
 
+            @Override
+            public boolean equals(Object o) {
+                return this == o || (o != null && getClass() == o.getClass());
+            }
+
+            @Override
+            public int hashCode() {
+                return 0; // Constant for singleton
+            }
+
+            @Override
+            public String toString() {
+                return "Inactive{}";
+            }
+        }
+
+        @Override
+        public abstract boolean equals(Object o);
+
+        @Override
+        public abstract int hashCode();
+
+        @Override
+        public abstract String toString();
+    }
 }

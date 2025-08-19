@@ -1,0 +1,212 @@
+package proxy
+
+// #cgo CFLAGS: -I.
+// extern int bypass_socket(int fd);
+import "C"
+import (
+	"context"
+	"net"
+	"sync"
+	"syscall"
+
+	"github.com/amnezia-vpn/amneziawg-android/shared"
+	"github.com/amnezia-vpn/amneziawg-android/util"
+	"github.com/amnezia-vpn/amneziawg-go/conn"
+	"github.com/amnezia-vpn/amneziawg-go/device"
+	"github.com/amnezia-vpn/amneziawg-go/ipc"
+	"github.com/amnezia-vpn/amneziawg-go/tun/netstack"
+	wireproxyawg "github.com/artem-russkikh/wireproxy-awg"
+)
+
+import "C"
+
+var (
+	ctx        context.Context
+	cancelFunc context.CancelFunc
+	tag string
+	virtualTunnelHandles map[int32]*wireproxyawg.VirtualTun
+)
+
+func init() {
+	tag = "AwgProxy"
+	virtualTunnelHandles = make(map[int32]*wireproxyawg.VirtualTun)
+}
+
+
+//export awgStartProxy
+func awgStartProxy(interfaceName string, config string, pkgName string, bypass int32) int32 {
+
+
+	conf, err := wireproxyawg.ParseConfigString(config)
+	if err != nil {
+		shared.LogError(tag,"Invalid config file", err)
+		return -1
+	}
+
+	setting, err := wireproxyawg.CreateIPCRequest(conf.Device)
+
+	if err != nil {
+		shared.LogError(tag,"Create IPC request failed", err)
+		return -1
+	}
+
+	tun, tnet, err := netstack.CreateNetTUN(setting.DeviceAddr, setting.DNS, setting.MTU)
+	if err != nil {
+		shared.LogError(tag, "Create TUN failed", err)
+		return -1
+	}
+
+	name, err := tun.Name()
+
+	shared.LogDebug(tag,"Creating device with domain blocking enabled: %v", conf.Device.DomainBlockingEnabled)
+
+	bind := conn.NewStdNetBind()
+	stdBind, ok := bind.(*conn.StdNetBind)
+	if !ok {
+		return -1
+	}
+
+	if bypass == 1 {
+		stdBind.SetControl(protectControlFunc)
+	}
+
+	dev := device.NewDevice(tun, stdBind, shared.NewLogger("Tun/" + interfaceName), conf.Device.DomainBlockingEnabled, conf.Device.BlockedDomains)
+
+	err = dev.IpcSet(setting.IpcRequest)
+
+	if err != nil {
+		shared.LogError(tag, "Ipc setting failed", err)
+		return -1
+	}
+
+	dev.DisableSomeRoamingForBrokenMobileSemantics()
+
+
+	uapiFile, err := ipc.UAPIOpen(pkgName, name)
+
+	var uapi net.Listener
+
+	if err != nil {
+		shared.LogError(tag, "UAPIOpen: %v", err)
+	} else {
+		uapi, err = ipc.UAPIListen(pkgName, name, uapiFile)
+		if err != nil {
+			uapiFile.Close()
+			shared.LogError(tag, "UAPIListen: %v", err)
+		} else {
+			go func() {
+				for {
+					connection, err := uapi.Accept()
+					if err != nil {
+						return
+					}
+					go dev.IpcHandle(connection)
+				}
+			}()
+		}
+	}
+
+	err = dev.Up()
+	if err != nil {
+		shared.LogError(tag, "Failed to bring up device", err)
+		uapiFile.Close()
+		dev.Close()
+		return -1
+	}
+
+	virtualTun := &wireproxyawg.VirtualTun{
+		Tnet:           tnet,
+		Dev:            dev,
+		Logger:         shared.NewLogger("Proxy"),
+		Uapi:           uapi,
+		Conf:           conf.Device,
+		PingRecord:     make(map[string]uint64),
+		PingRecordLock: new(sync.Mutex),
+	}
+
+	handle, err2 := util.GenerateHandle(virtualTunnelHandles)
+	if err2 != nil {
+		shared.LogError(tag, "Error generating handle for tunnel: %v", err)
+		uapiFile.Close()
+		dev.Close()
+		return -1
+	}
+
+	virtualTunnelHandles[handle] = virtualTun
+
+	// Create cancellable context
+	ctx, cancelFunc = context.WithCancel(context.Background())
+
+	// Spawn all routines with context
+	for _, spawner := range conf.Routines {
+		shared.LogDebug(tag, "Spawning routine..")
+		go func(s wireproxyawg.RoutineSpawner) {
+			if err := s.SpawnRoutine(ctx, virtualTun); err != nil {
+				shared.LogError(tag, "Routine failed: %v", err)
+			}
+		}(spawner)
+	}
+
+	shared.LogDebug(tag, "Done starting proxy and tunnel")
+	return handle
+}
+
+//export awgGetProxyConfig
+func awgGetProxyConfig(tunnelHandle int32) *C.char {
+	handle, ok := virtualTunnelHandles[tunnelHandle]
+	if !ok {
+		shared.LogError(tag, "Tunnel is not up")
+		return nil
+	}
+	settings, err := handle.Dev.IpcGet()
+	if err != nil {
+		shared.LogError(tag, "Failed to get device config: %v", err)
+		return nil
+	}
+	return C.CString(settings)
+}
+
+//export awgStopProxy
+func awgStopProxy() {
+	// Signal routines to stop
+	if cancelFunc != nil {
+		shared.LogDebug(tag, "Stopping proxy routines..")
+		cancelFunc()
+	}
+	for handle, _ := range virtualTunnelHandles {
+		awgTurnProxyTunnelOff(handle)
+	}
+}
+
+// control hook to bypass sockets
+func protectControlFunc(network, address string, c syscall.RawConn) error {
+	var opErr error
+	err := c.Control(func(fd uintptr) {
+		if C.bypass_socket(C.int(fd)) == 0 {
+			opErr = syscall.EACCES
+			shared.LogError(tag, "Failed to protect socket FD: %d", fd)
+		} else {
+			shared.LogDebug(tag, "Protected socket FD: %d", fd)
+		}
+	})
+	if err != nil {
+		return err
+	}
+	return opErr
+}
+
+func awgTurnProxyTunnelOff(virtualTunnelHandle int32) {
+	virtualTun, ok := virtualTunnelHandles[virtualTunnelHandle]
+	if !ok {
+		shared.LogError(tag, "Tunnel is not up")
+		return
+	}
+	delete(virtualTunnelHandles, virtualTunnelHandle)
+
+	shared.LogDebug(tag,"Closing tunnel..")
+	if virtualTun.Uapi != nil {
+		virtualTun.Uapi.Close()
+	}
+	virtualTun.Dev.Close()
+	shared.LogDebug(tag,"Tunnel closed")
+}

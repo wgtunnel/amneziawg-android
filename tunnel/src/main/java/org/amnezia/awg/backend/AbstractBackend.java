@@ -7,45 +7,69 @@ package org.amnezia.awg.backend;
 
 import android.content.Context;
 import android.content.Intent;
+import android.net.VpnService;
 import android.os.ParcelFileDescriptor;
+import android.util.ArraySet;
 import android.util.Log;
 import androidx.annotation.Nullable;
-import androidx.collection.ArraySet;
 import com.getkeepsafe.relinker.ReLinker;
 import org.amnezia.awg.config.Config;
+import org.amnezia.awg.config.DnsSettings;
+import org.amnezia.awg.config.InetEndpoint;
+import org.amnezia.awg.config.Peer;
 import org.amnezia.awg.crypto.Key;
 import org.amnezia.awg.crypto.KeyFormatException;
+import org.amnezia.awg.hevtunnel.TProxyService;
 import org.amnezia.awg.util.NonNullForAll;
 
+import javax.net.SocketFactory;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Set;
+import java.net.*;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReentrantLock;
 
-import static org.amnezia.awg.GoBackend.*;
+import static org.amnezia.awg.GoBackend.awgTurnOff;
+import static org.amnezia.awg.GoBackend.awgVersion;
+import static org.amnezia.awg.ProxyGoBackend.awgSetSocketProtector;
+import static org.amnezia.awg.ProxyGoBackend.awgStopProxy;
 
 @NonNullForAll
-public abstract class AbstractBackend implements Backend, KillSwitchHandler {
+public abstract class AbstractBackend implements Backend {
     private static final String TAG = "AmneziaWG/AbstractBackend";
+
+    private static final int DNS_RESOLUTION_RETRIES = 3;
+    private static final long INITIAL_BACKOFF_MS = 500;
+    private static final int MTU = 1280;
+
+    //kill switch defaults
+    protected static final String USERNAME = "local";
+    protected static final String PASSWORD = UUID.randomUUID().toString();
+    protected static final String LOCALHOST = "127.0.0.1";
+    protected static final int PORT = 25344;
+
     protected final Context context;
     protected final TunnelActionHandler tunnelActionHandler;
 
-    @Nullable private static VpnService.AlwaysOnCallback alwaysOnCallback;
     @Nullable protected Config currentConfig;
     @Nullable protected Tunnel currentTunnel;
     protected int currentTunnelHandle = -1;
-    protected BackendStatus backendStatus = BackendStatus.Inactive.INSTANCE;
 
-    static CompletableFuture<VpnService> vpnService = new CompletableFuture<>();
+    protected final ReentrantLock tunnelLock = new ReentrantLock();
+
+    protected static CompletableFuture<VpnService> vpnService = new CompletableFuture<>();
+
+    @Nullable private static VpnService.AlwaysOnCallback alwaysOnCallback;
 
     public static void setAlwaysOnCallback(final VpnService.AlwaysOnCallback cb) {
         alwaysOnCallback = cb;
     }
-
+    protected volatile BackendMode backendMode = BackendMode.Inactive.INSTANCE;
 
     protected AbstractBackend(final Context context, final TunnelActionHandler tunnelActionHandler) {
         ReLinker.loadLibrary(context, "am-go");
@@ -69,8 +93,8 @@ public abstract class AbstractBackend implements Backend, KillSwitchHandler {
     }
 
     @Override
-    public BackendStatus getBackendStatus() {
-        return backendStatus;
+    public BackendMode getBackendMode() {
+        return backendMode;
     }
 
     @Override
@@ -79,12 +103,110 @@ public abstract class AbstractBackend implements Backend, KillSwitchHandler {
     }
 
     @Override
+    public Tunnel.State setState(final Tunnel tunnel, Tunnel.State state, @Nullable final Config config) throws Exception {
+        tunnelLock.lock();
+        try {
+            final Tunnel.State originalState = getState(tunnel);
+            if (state == originalState && tunnel == currentTunnel && config == currentConfig) {
+                return originalState;
+            }
+            if (state == Tunnel.State.UP) {
+                final Config originalConfig = currentConfig;
+                final Tunnel originalTunnel = currentTunnel;
+                if (currentTunnel != null) {
+                    setStateInternal(currentTunnel, null, Tunnel.State.DOWN);
+                }
+                try {
+                    handleResolverConfiguration(config);
+                    setStateInternal(tunnel, config, state);
+                } catch (final Exception e) {
+                    if (originalTunnel != null) {
+                        setStateInternal(originalTunnel, originalConfig, Tunnel.State.UP);
+                    }
+                    throw e;
+                }
+            } else if (state == Tunnel.State.DOWN && tunnel == currentTunnel) {
+                setStateInternal(tunnel, null, Tunnel.State.DOWN);
+            }
+            return getState(tunnel);
+        } finally {
+            tunnelLock.unlock();
+        }
+    }
+
+    private void handleResolverConfiguration(@Nullable Config config) throws ExecutionException, InterruptedException, TimeoutException {
+        // Set resolver based on mode
+        boolean isKillSwitch = backendMode instanceof BackendMode.KillSwitch;
+        SocketFactory socketFactory = isKillSwitch ? vpnService.get(2, TimeUnit.SECONDS).new ProtectedSocketFactory() : null;
+        // Need to pass settings for useDOH and dohUrl via settings
+        DnsSettings dnsSettings = (config != null && config.getDnsSettings() != null) ? config.getDnsSettings() : new DnsSettings(false, null);
+        InetEndpoint.setResolver(dnsSettings.dohEnabled() || isKillSwitch ? new InetEndpoint.DoHResolver(dnsSettings.dohUrl(), Optional.ofNullable(socketFactory)) : new InetEndpoint.SystemResolver());
+    }
+
+    @Override
+    public BackendMode setBackendMode(BackendMode backendMode) throws Exception {
+        tunnelLock.lock();
+        try {
+            this.backendMode = setBackendModeInternal(backendMode);
+            return this.backendMode;
+        } finally {
+            tunnelLock.unlock();
+        }
+    }
+
+    protected void setStateInternal(final Tunnel tunnel, @Nullable final Config config, final Tunnel.State state)
+            throws Exception {
+        Log.i(TAG, "Bringing tunnel " + tunnel.getName() + ' ' + state);
+        if (state == Tunnel.State.UP) {
+            if (config == null) {
+                throw new BackendException(BackendException.Reason.TUNNEL_MISSING_CONFIG);
+            }
+            configureAndStartTunnel(tunnel, config);
+            currentTunnel = tunnel;
+            currentConfig = config;
+        } else {
+            if (currentTunnelHandle == -1) {
+                Log.w(TAG, "Tunnel already down");
+                return;
+            }
+            stopTunnel(tunnel, currentConfig);
+            currentTunnel = null;
+            currentTunnelHandle = -1;
+            currentConfig = null;
+        }
+        tunnel.onStateChange(state);
+    }
+
+    protected VpnService startVpnService(AbstractBackend owner) throws Exception {
+        if (!vpnService.isDone()) {
+            Log.d(TAG, "Requesting to start VpnService");
+            context.startService(new Intent(context, VpnService.class));
+        } else return vpnService.get(2, TimeUnit.SECONDS);
+        VpnService service;
+        try {
+            service = vpnService.get(2, TimeUnit.SECONDS);
+        } catch (final TimeoutException e) {
+            final Exception be = new BackendException(BackendException.Reason.UNABLE_TO_START_VPN);
+            be.initCause(e);
+            throw be;
+        }
+        service.setOwner(owner);
+        return service;
+    }
+
+    protected abstract void configureAndStartTunnel(Tunnel tunnel, Config config) throws Exception;
+
+    protected abstract void stopTunnel(Tunnel tunnel, @Nullable Config config) throws Exception;
+
+    protected abstract BackendMode setBackendModeInternal(BackendMode backendMode) throws Exception;
+
+    @Override
     public Statistics getStatistics(final Tunnel tunnel) throws Exception {
         final Statistics stats = new Statistics();
         if (tunnel != currentTunnel || currentTunnelHandle == -1) {
             return stats;
         }
-        final String config = awgGetConfig(currentTunnelHandle);
+        final String config = getTunnelConfig(currentTunnelHandle);
         if (config == null) {
             return stats;
         }
@@ -159,162 +281,47 @@ public abstract class AbstractBackend implements Backend, KillSwitchHandler {
         return stats;
     }
 
-    @Override
-    public Tunnel.State setState(final Tunnel tunnel, Tunnel.State state, @Nullable final Config config) throws Exception {
-        final Tunnel.State originalState = getState(tunnel);
-        if (state == originalState && tunnel == currentTunnel && config == currentConfig) {
-            return originalState;
-        }
-        if (state == Tunnel.State.UP) {
-            final Config originalConfig = currentConfig;
-            final Tunnel originalTunnel = currentTunnel;
-            if (currentTunnel != null) {
-                setStateInternal(currentTunnel, null, Tunnel.State.DOWN);
-            }
-            try {
-                setStateInternal(tunnel, config, state);
-            } catch (final Exception e) {
-                if (originalTunnel != null) {
-                    setStateInternal(originalTunnel, originalConfig, Tunnel.State.UP);
+    @Nullable
+    protected abstract String getTunnelConfig(int handle);
+
+    protected void resolvePeerEndpoints(Config config, Tunnel tunnel) throws BackendException {
+        List<InetEndpoint> failedEndpoints = new ArrayList<>();
+        for (int i = 0; i < DNS_RESOLUTION_RETRIES; ++i) {
+            failedEndpoints.clear();
+            for (final Peer peer : config.getPeers()) {
+                Optional<InetEndpoint> epOpt = peer.getEndpoint();
+                if (epOpt.isEmpty()) continue;
+                InetEndpoint ep = epOpt.get();
+                if (ep.getResolved(tunnel.isIpv4ResolutionPreferred()).isEmpty()) {
+                    failedEndpoints.add(ep);
                 }
-                throw e;
             }
-        } else if (state == Tunnel.State.DOWN && tunnel == currentTunnel) {
-            setStateInternal(tunnel, null, Tunnel.State.DOWN);
-        }
-        return getState(tunnel);
-    }
-
-    public interface AlwaysOnCallback {
-        void alwaysOnTriggered();
-    }
-
-    @Override
-    public BackendStatus setBackendStatus(BackendStatus backendStatus) throws Exception {
-        if ((this.backendStatus instanceof BackendStatus.Inactive && backendStatus instanceof BackendStatus.Inactive) ||
-                (this.backendStatus instanceof BackendStatus.ServiceActive && backendStatus instanceof BackendStatus.ServiceActive) ||
-                (this.backendStatus instanceof BackendStatus.KillSwitchActive currentKillSwitch &&
-                        backendStatus instanceof BackendStatus.KillSwitchActive newKillSwitch &&
-                        currentKillSwitch.getAllowedIps().equals(newKillSwitch.getAllowedIps()))) {
-            Log.d(TAG, "Backend status already active");
-            return this.backendStatus;
-        }
-        if (currentTunnel != null) {
-            Log.d(TAG, "Tunnel running, deferring status change until tunnel is down");
-            this.backendStatus = backendStatus;
-            return backendStatus;
-        }
-        this.backendStatus = setBackendStatusInternal(backendStatus);
-        return this.backendStatus;
-    }
-
-    private void setStateInternal(final Tunnel tunnel, @Nullable final Config config, final Tunnel.State state)
-            throws Exception {
-        Log.i(TAG, "Bringing tunnel " + tunnel.getName() + ' ' + state);
-        if (state == Tunnel.State.UP) {
-            if (config == null) {
-                throw new BackendException(BackendException.Reason.TUNNEL_MISSING_CONFIG);
-            }
-            // Deactivate killswitch before bringing up the tunnel
-            if (backendStatus instanceof BackendStatus.KillSwitchActive) {
-                deactivateKillSwitch();
-            }
-            configureAndStartTunnel(tunnel, config);
-            currentTunnel = tunnel;
-            currentConfig = config;
-        } else {
-            if (currentTunnelHandle == -1) {
-                Log.w(TAG, "Tunnel already down");
-                return;
-            }
-            stopTunnel(tunnel, currentConfig);
-            currentTunnel = null;
-            currentTunnelHandle = -1;
-            currentConfig = null;
-            if (backendStatus instanceof BackendStatus.KillSwitchActive killSwitch) {
-                activateKillSwitch(killSwitch.getAllowedIps());
-            } else if (backendStatus instanceof BackendStatus.ServiceActive) {
-                activateService();
-            } else if (backendStatus instanceof BackendStatus.Inactive) {
-                shutdown();
+            if (failedEndpoints.isEmpty()) break;
+            if (i < DNS_RESOLUTION_RETRIES - 1) {
+                for (InetEndpoint ep : failedEndpoints) {
+                    Log.w(TAG, "DNS host \"" + ep.getHost() + "\" failed (attempt " + (i + 1) + " of " + DNS_RESOLUTION_RETRIES + ")");
+                }
+                try {
+                    Thread.sleep(INITIAL_BACKOFF_MS * (1 << i));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new BackendException(BackendException.Reason.DNS_RESOLUTION_FAILURE, "Interrupted during DNS retry");
+                }
+            } else {
+                throw new BackendException(BackendException.Reason.DNS_RESOLUTION_FAILURE, failedEndpoints.get(0).getHost());
             }
         }
-        tunnel.onStateChange(state);
-    }
-
-    @Override
-    public void activateKillSwitch(Collection<String> allowedIps) throws Exception {
-        if (!vpnService.isDone()) {
-            Log.d(TAG, "Requesting to start VpnService for kill switch");
-            context.startService(new Intent(context, VpnService.class));
-        }
-        try {
-            VpnService service = vpnService.get(2, TimeUnit.SECONDS);
-            service.setOwner(this);
-            service.activateKillSwitch(allowedIps);
-            this.backendStatus = new BackendStatus.KillSwitchActive(allowedIps);
-        } catch (final Exception e) {
-            Log.e(TAG, "Failed to activate kill switch", e);
-            this.backendStatus = BackendStatus.Inactive.INSTANCE;
-            throw e;
-        }
-    }
-
-    @Override
-    public void deactivateKillSwitch() throws Exception {
-        if (vpnService.isDone()) {
-            try {
-                VpnService service = vpnService.get(0, TimeUnit.MILLISECONDS);
-                service.deactivateKillSwitch();
-                this.backendStatus = BackendStatus.Inactive.INSTANCE;
-            } catch (final Exception e) {
-                Log.e(TAG, "Failed to deactivate kill switch", e);
-                this.backendStatus = BackendStatus.Inactive.INSTANCE;
-                throw e;
-            }
-        } else {
-            Log.i(TAG, "No VpnService active for kill switch deactivation");
-            this.backendStatus = BackendStatus.Inactive.INSTANCE;
-        }
-    }
-
-    protected abstract void configureAndStartTunnel(Tunnel tunnel, Config config) throws Exception;
-
-    protected abstract void stopTunnel(Tunnel tunnel, @Nullable Config config) throws Exception;
-
-    protected abstract BackendStatus setBackendStatusInternal(BackendStatus backendStatus) throws Exception;
-
-    protected void activateService() {
-        if (!vpnService.isDone()) {
-            Log.d(TAG, "Requesting service activation");
-            context.startService(new Intent(context, VpnService.class));
-        }
-        try {
-            VpnService service = vpnService.get(2, TimeUnit.SECONDS);
-            if(backendStatus instanceof BackendStatus.KillSwitchActive) service.deactivateKillSwitch();
-            Log.d(TAG, "Service is now active");
-            service.setOwner(this);
-            backendStatus = BackendStatus.ServiceActive.INSTANCE;
-        } catch (final TimeoutException | ExecutionException | InterruptedException ignored) {
-            backendStatus = BackendStatus.Inactive.INSTANCE;
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to activate service", e);
-        }
-    }
-
-    protected void shutdown() throws Exception {
-        Log.d(TAG, "Shutdown...");
-        if (backendStatus instanceof BackendStatus.KillSwitchActive) {
-            deactivateKillSwitch();
-        }
-        this.backendStatus = BackendStatus.Inactive.INSTANCE;
     }
 
     @NonNullForAll
-    public static class VpnService extends android.net.VpnService {
+    public static class VpnService extends android.net.VpnService implements SocketProtector {
         private static final String TAG = "AmneziaWG/VpnService";
-        @Nullable private KillSwitchHandler owner;
-        @Nullable private ParcelFileDescriptor mInterface;
+        private static final String HEV_CONFIG_FILE_NAME = "tproxy.conf";
+
+        @Nullable private AbstractBackend owner;
+
+        @Nullable private Thread hevStartThread;
+        @Nullable private ParcelFileDescriptor fd;
 
         public Builder getBuilder() {
             return new Builder();
@@ -328,21 +335,28 @@ public abstract class AbstractBackend implements Backend, KillSwitchHandler {
 
         @Override
         public void onDestroy() {
-            if (owner != null && owner instanceof AbstractBackend backend) {
-                final Tunnel tunnel = backend.currentTunnel;
-                if (tunnel != null) {
-                    if (backend.currentTunnelHandle != -1) {
-                        awgTurnOff(backend.currentTunnelHandle);
-                    }
-                    backend.currentTunnel = null;
-                    backend.currentTunnelHandle = -1;
-                    backend.currentConfig = null;
-                    backend.backendStatus = Backend.BackendStatus.Inactive.INSTANCE;
-                    tunnel.onStateChange(Tunnel.State.DOWN);
-                }
-            }
+            if (owner != null) handleDestroy(owner);
             vpnService = new CompletableFuture<>();
             super.onDestroy();
+        }
+
+        public void shutdown() {
+            stopKillSwitch();
+        }
+
+        private void handleDestroy(final AbstractBackend owner) {
+            final Tunnel tunnel = owner.currentTunnel;
+            if (tunnel != null) {
+                if (owner.currentTunnelHandle != -1) {
+                    if(owner instanceof GoBackend) awgTurnOff(owner.currentTunnelHandle);
+                    if(owner instanceof ProxyGoBackend) awgStopProxy();
+                }
+                owner.currentTunnel = null;
+                owner.currentTunnelHandle = -1;
+                owner.currentConfig = null;
+                owner.backendMode = BackendMode.Inactive.INSTANCE;
+                tunnel.onStateChange(Tunnel.State.DOWN);
+            }
         }
 
         @Override
@@ -357,19 +371,17 @@ public abstract class AbstractBackend implements Backend, KillSwitchHandler {
             return super.onStartCommand(intent, flags, startId);
         }
 
-        public void setOwner(final KillSwitchHandler owner) {
+        public void setOwner(final AbstractBackend owner) {
             this.owner = owner;
-            if (owner instanceof AbstractBackend backend) {
-                backend.backendStatus = Backend.BackendStatus.ServiceActive.INSTANCE;
-            }
+            if(owner instanceof ProxyGoBackend) awgSetSocketProtector(this);
         }
 
-        public void activateKillSwitch(Collection<String> allowedIps) throws Exception {
+        protected void activateKillSwitch(Set<String> allowedIps) throws Exception {
             Builder builder = new Builder();
             Log.d(TAG, "Starting kill switch with allowedIps: " + allowedIps);
-            builder.setSession("KillSwitchSession")
-                    .addAddress("10.0.0.2", 32)
-                    .addAddress("2001:db8::2", 64);
+            builder.setSession("Lockdown");
+            builder.addAddress("10.0.0.1", 32); // Dummy IPv4
+//            builder.addAddress("2001:db8::1", 128); // Dummy IPv6 (non-routable, per RFC 3849)
             if (allowedIps.isEmpty()) {
                 builder.addRoute("0.0.0.0", 0);
             } else {
@@ -379,36 +391,146 @@ public abstract class AbstractBackend implements Backend, KillSwitchHandler {
                     builder.addRoute(netSplit[0], Integer.parseInt(netSplit[1]));
                 });
             }
+
             builder.addRoute("::", 0);
-            try {
-                if (mInterface != null) {
-                    mInterface.close();
+            builder.setMtu(MTU);
+            builder.addDnsServer("1.1.1.1");
+
+            fd = builder.establish();
+            if (fd == null) {
+                throw new IOException("Failed to establish VPN interface");
+            }
+
+            hevStartThread = new Thread(() -> {
+                try {
+                    startHevTunnel();
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to start hev tunnel", e);
                 }
-                mInterface = builder.establish();
-                if (owner instanceof AbstractBackend backend) {
-                    backend.backendStatus = new Backend.BackendStatus.KillSwitchActive(allowedIps);
+            });
+            hevStartThread.start();
+        }
+
+        @Override
+        public int bypass(int fd) {
+            Log.d(TAG, "Bypassing VPN fd: " + fd);
+            int isProtected = protect(fd) ? 1 : 0;
+            Log.d(TAG, "Socked protected result: " + fd);
+            return isProtected;
+        }
+
+        private void stopKillSwitch() {
+            TProxyService.TProxyStopService();
+            if (hevStartThread != null && hevStartThread.isAlive()) {
+                hevStartThread.interrupt();
+                try {
+                    hevStartThread.join(2000); // Wait up to 2s for thread to stop
+                } catch (InterruptedException e) {
+                    Log.w(TAG, "Interrupted while joining hev thread", e);
+                    Thread.currentThread().interrupt();
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to start kill switch", e);
-                throw e;
+                hevStartThread = null;
+            }
+            if(fd != null) {
+                Log.d(TAG,"Fd is not null, we need to close it");
+                try {
+                    fd.close();
+                    fd = null;
+                } catch (IOException e) {
+                    Log.w(TAG,"Error while closing VPN service", e);
+                }
+            }
+            Log.d(TAG, "Kill switch stopped");
+        }
+
+        private void startHevTunnel() throws IOException {
+            File tproxyFile = new File(getCacheDir(), HEV_CONFIG_FILE_NAME);
+            String hevConf = String.format("""
+                misc:
+                  task-stack-size: 10240
+                tunnel:
+                  mtu: %d
+                socks5:
+                  address: '%s'
+                  port: %d
+                  username: '%s'
+                  password: '%s'
+                  udp: 'udp'
+                """, MTU, LOCALHOST, PORT, USERNAME, PASSWORD);
+
+            try (FileOutputStream fos = new FileOutputStream(tproxyFile, false)) {
+                fos.write(hevConf.getBytes());
+            } catch (IOException e) {
+                Log.e(TAG, "Failed to write tproxy.conf: " + e.getMessage());
+                throw new IOException("Failed to write tproxy.conf", e);
+            }
+
+            while (!Thread.currentThread().isInterrupted()) {
+                try (Socket socket = new Socket()) {
+                    socket.connect(new InetSocketAddress(LOCALHOST, PORT), 1000);
+                    Log.d(TAG, "SOCKS5 proxy is up, starting hev-socks5-tunnel...");
+                    if(fd != null) {
+                        // use dup, as hev expects java side to manage closure
+                        TProxyService.TProxyStartService(tproxyFile.getAbsolutePath(), fd.getFd());
+                    }
+                    return;  // Success, exit the method
+                } catch (IOException e) {
+                    Log.d(TAG, "SOCKS5 proxy not ready yet, retrying...");
+                }
+
+                try {
+                    Thread.sleep(3000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    Log.d(TAG, "Hev start interrupted");
+                    return;  // Exit on interrupt
+                }
             }
         }
 
-        public void deactivateKillSwitch() throws Exception {
-            if (mInterface != null) {
-                try {
-                    mInterface.close();
-                    Log.d(TAG, "FD closed");
-                    mInterface = null;
-                    if (owner instanceof AbstractBackend backend) {
-                        backend.backendStatus = Backend.BackendStatus.ServiceActive.INSTANCE;
-                    }
-                } catch (IOException e) {
-                    Log.e(TAG, "Failed to stop kill switch", e);
-                    throw e;
-                }
-            } else {
-                Log.i(TAG, "FD already closed");
+        private class ProtectedSocketFactory extends SocketFactory {
+            @Override
+            public Socket createSocket() throws IOException {
+                Socket socket = new Socket();
+                // Explicitly bind to any local address and random port (0) before connecting.
+                socket.bind(new InetSocketAddress(0));
+                // Protect the socket *before* any connection attempt.
+                if (!protect(socket)) {
+                    Log.w(TAG, "protected socket failed");
+                    socket.close();  // Clean up if protection fails.
+                    throw new IOException("Failed to protect socket before connect");
+                } else Log.d(TAG, "protected socket created");
+                return socket;
+            }
+
+            @Override
+            public Socket createSocket(String host, int port) throws IOException {
+                Socket socket = createSocket();
+                socket.connect(new InetSocketAddress(host, port));
+                return socket;
+            }
+
+            @Override
+            public Socket createSocket(String host, int port, InetAddress localHost, int localPort) throws IOException {
+                Socket socket = createSocket();
+                socket.bind(new InetSocketAddress(localHost, localPort));
+                socket.connect(new InetSocketAddress(host, port));
+                return socket;
+            }
+
+            @Override
+            public Socket createSocket(InetAddress host, int port) throws IOException {
+                Socket socket = createSocket();
+                socket.connect(new InetSocketAddress(host, port));
+                return socket;
+            }
+
+            @Override
+            public Socket createSocket(InetAddress address, int port, InetAddress localAddress, int localPort) throws IOException {
+                Socket socket = createSocket();
+                socket.bind(new InetSocketAddress(localAddress, localPort));
+                socket.connect(new InetSocketAddress(address, port));
+                return socket;
             }
         }
 
@@ -416,5 +538,4 @@ public abstract class AbstractBackend implements Backend, KillSwitchHandler {
             void alwaysOnTriggered();
         }
     }
-
 }

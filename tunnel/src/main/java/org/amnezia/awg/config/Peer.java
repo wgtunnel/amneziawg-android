@@ -185,6 +185,23 @@ public final class Peer {
     }
 
     /**
+     * Converts the {@code Peer} into a string suitable for inclusion in a {@code awg-quick}
+     * configuration file with resolved endpoints.
+     *
+     * @return the {@code Peer} represented as a series of "Key = Value" lines
+     */
+    public String toAwgQuickStringResolved(Boolean preferIpv4) {
+        final StringBuilder sb = new StringBuilder();
+        if (!allowedIps.isEmpty())
+            sb.append("AllowedIPs = ").append(Attribute.join(allowedIps)).append('\n');
+        endpoint.flatMap(ep -> ep.getResolved(preferIpv4)).ifPresent(ep -> sb.append("Endpoint =").append(ep).append('\n'));
+        persistentKeepalive.ifPresent(pk -> sb.append("PersistentKeepalive = ").append(pk).append('\n'));
+        preSharedKey.ifPresent(psk -> sb.append("PreSharedKey = ").append(psk.toBase64()).append('\n'));
+        sb.append("PublicKey = ").append(publicKey.toBase64()).append('\n');
+        return sb.toString();
+    }
+
+    /**
      * Serializes the {@code Peer} for use with the AmneziaWG cross-platform userspace API. Note
      * that not all attributes are included in this representation.
      *

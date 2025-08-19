@@ -1,4 +1,4 @@
-package org.amnezia.awg.config;
+package org.amnezia.awg.config.proxy;
 
 import androidx.annotation.Nullable;
 
@@ -8,7 +8,7 @@ public class HttpProxy extends Proxy {
     }
 
     @Override
-    String toQuickString() {
+    public String toQuickString() {
         return "[http]\n" +
                 "BindAddress = " + bindAddress + "\n" +
                 buildAuthString();
