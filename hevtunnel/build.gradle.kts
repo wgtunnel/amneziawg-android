@@ -1,7 +1,8 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-    id("maven-publish")
+    `maven-publish`
+    signing
 }
 
 android {
@@ -74,8 +75,8 @@ publishing {
                 from(components["release"])
             }
             pom {
-                name.set("Amnezia WG Tunnel Library")
-                description.set("Embeddable tunnel library for WG for Android")
+                name.set("Hev SOCKS5 Tunnel Library")
+                description.set("Embeddable tun2socks wrapper library for Android")
                 url.set("https://amnezia.org/")
 
                 licenses {
@@ -103,4 +104,12 @@ publishing {
             }
         }
     }
+}
+
+signing {
+    useInMemoryPgpKeys(
+        getLocalProperty("SECRET_KEY") ?: System.getenv("SECRET_KEY"),
+        getLocalProperty("PASSWORD") ?: System.getenv("PASSWORD")
+    )
+    sign(publishing.publications)
 }
