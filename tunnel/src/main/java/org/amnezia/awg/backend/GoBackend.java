@@ -12,548 +12,118 @@ import android.os.ParcelFileDescriptor;
 import android.system.OsConstants;
 import android.util.Log;
 import androidx.annotation.Nullable;
-import androidx.collection.ArraySet;
-import com.getkeepsafe.relinker.ReLinker;
-import org.amnezia.awg.backend.BackendException.Reason;
-import org.amnezia.awg.backend.Tunnel.State;
 import org.amnezia.awg.config.Config;
-import org.amnezia.awg.config.InetEndpoint;
 import org.amnezia.awg.config.InetNetwork;
 import org.amnezia.awg.config.Peer;
-import org.amnezia.awg.crypto.Key;
-import org.amnezia.awg.crypto.KeyFormatException;
 import org.amnezia.awg.util.NonNullForAll;
 
-import java.io.IOException;
 import java.net.InetAddress;
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.amnezia.awg.GoBackend.*;
 
-/**
- * Implementation of {@link Backend} that uses the amneziawg-go userspace implementation to provide
- * AmneziaWG tunnels.
- */
 @NonNullForAll
-public final class GoBackend implements Backend {
+public final class GoBackend extends AbstractBackend {
     private static final String TAG = "AmneziaWG/GoBackend";
-    private static final int DNS_RESOLUTION_RETRIES = 3;
-    @Nullable private static AlwaysOnCallback alwaysOnCallback;
-    private static CompletableFuture<VpnService> vpnService = new CompletableFuture<>();
-    private final Context context;
-    private final TunnelActionHandler tunnelActionHandler;
-    @Nullable private Config currentConfig;
-    @Nullable private Tunnel currentTunnel;
-    private int currentTunnelHandle = -1;
-    private BackendStatus backendStatus = BackendStatus.Inactive.INSTANCE;
 
-    /**
-     * Public constructor for GoBackend.
-     *
-     * @param context An Android {@link Context}
-     */
     public GoBackend(final Context context, final TunnelActionHandler tunnelActionHandler) {
-        ReLinker.loadLibrary(context, "am-go");
-        this.context = context;
-        this.tunnelActionHandler = tunnelActionHandler;
-    }
-
-    /**
-     * Set a {@link AlwaysOnCallback} to be invoked when {@link VpnService} is started by the
-     * system's Always-On VPN mode.
-     *
-     * @param cb Callback to be invoked
-     */
-    public static void setAlwaysOnCallback(final AlwaysOnCallback cb) {
-        alwaysOnCallback = cb;
-    }
-
-
-
-    /**
-     * Method to get the names of running tunnels.
-     *
-     * @return A set of string values denoting names of running tunnels.
-     */
-    @Override
-    public Set<String> getRunningTunnelNames() {
-        if (currentTunnel != null) {
-            final Set<String> runningTunnels = new ArraySet<>();
-            runningTunnels.add(currentTunnel.getName());
-            return runningTunnels;
-        }
-        return Collections.emptySet();
-    }
-
-    /**
-     * Get the associated {@link State} for a given {@link Tunnel}.
-     *
-     * @param tunnel The tunnel to examine the state of.
-     * @return {@link State} associated with the given tunnel.
-     */
-    @Override
-    public State getState(final Tunnel tunnel) {
-        return currentTunnel == tunnel ? State.UP : State.DOWN;
+        super(context, tunnelActionHandler);
     }
 
     @Override
-    public BackendStatus getBackendStatus() {
-        return backendStatus;
-    }
+    protected void configureAndStartTunnel(final Tunnel tunnel, final Config config) throws Exception {
+        if (VpnService.prepare(context) != null) {
+            throw new BackendException(BackendException.Reason.VPN_NOT_AUTHORIZED);
+        }
 
-    /**
-     * Get the associated {@link Statistics} for a given {@link Tunnel}.
-     *
-     * @param tunnel The tunnel to retrieve statistics for.
-     * @return {@link Statistics} associated with the given tunnel.
-     */
-    @Override
-    public Statistics getStatistics(final Tunnel tunnel) {
-        final Statistics stats = new Statistics();
-        if (tunnel != currentTunnel || currentTunnelHandle == -1)
-            return stats;
-        final String config = awgGetConfig(currentTunnelHandle);
-        if (config == null)
-            return stats;
-        Key key = null;
-        long rx = 0;
-        long tx = 0;
-        String endpoint = "";
-        long latestHandshakeMSec = 0;
-        for (final String line : config.split("\\n")) {
-            if (line.startsWith("public_key=")) {
-                if (key != null)
-                    stats.add(key, endpoint, rx, tx, latestHandshakeMSec);
-                rx = 0;
-                tx = 0;
-                latestHandshakeMSec = 0;
-                try {
-                    key = Key.fromHex(line.substring(11));
-                } catch (final KeyFormatException ignored) {
-                    key = null;
-                }
-            } else if (line.startsWith("rx_bytes=")) {
-                if (key == null)
-                    continue;
-                try {
-                    rx = Long.parseLong(line.substring(9));
-                } catch (final NumberFormatException ignored) {
-                    rx = 0;
-                }
-            } else if (line.startsWith("endpoint=")) {
-                if (key == null)
-                    continue;
-                try {
-                    endpoint = line.substring(9);
-                } catch (final Exception ignored) {
-                    endpoint = "";
-                }
-            } else if (line.startsWith("tx_bytes=")) {
-                if (key == null)
-                    continue;
-                try {
-                    tx = Long.parseLong(line.substring(9));
-                } catch (final NumberFormatException ignored) {
-                    tx = 0;
-                }
-            } else if (line.startsWith("last_handshake_time_sec=")) {
-                if (key == null)
-                    continue;
-                try {
-                    latestHandshakeMSec += Long.parseLong(line.substring(24)) * 1000;
-                } catch (final NumberFormatException ignored) {
-                    latestHandshakeMSec = 0;
-                }
-            } else if (line.startsWith("last_handshake_time_nsec=")) {
-                if (key == null)
-                    continue;
-                try {
-                    latestHandshakeMSec += Long.parseLong(line.substring(25)) / 1000000;
-                } catch (final NumberFormatException ignored) {
-                    latestHandshakeMSec = 0;
-                }
+        final VpnService service = startVpnService(this);
+
+        if (currentTunnelHandle != -1) {
+            Log.w(TAG, "Tunnel already up");
+            return;
+        }
+
+        resolvePeerEndpoints(config, tunnel);
+
+        final String goConfig = config.toAwgQuickString(false, false);
+        final VpnService.Builder builder = service.getBuilder();
+        builder.setSession(tunnel.getName());
+
+        for (final String excludedApplication : config.getInterface().getExcludedApplications())
+            builder.addDisallowedApplication(excludedApplication);
+
+        for (final String includedApplication : config.getInterface().getIncludedApplications())
+            builder.addAllowedApplication(includedApplication);
+
+        for (final InetNetwork addr : config.getInterface().getAddresses())
+            builder.addAddress(addr.getAddress(), addr.getMask());
+
+        for (final InetAddress addr : config.getInterface().getDnsServers())
+            builder.addDnsServer(addr.getHostAddress());
+
+        for (final String dnsSearchDomain : config.getInterface().getDnsSearchDomains())
+            builder.addSearchDomain(dnsSearchDomain);
+
+        boolean sawDefaultRoute = false;
+        for (final Peer peer : config.getPeers()) {
+            for (final InetNetwork addr : peer.getAllowedIps()) {
+                if (addr.getMask() == 0)
+                    sawDefaultRoute = true;
+                builder.addRoute(addr.getAddress(), addr.getMask());
             }
         }
-        if (key != null)
-            stats.add(key, endpoint, rx, tx, latestHandshakeMSec);
-        return stats;
-    }
 
-    /**
-     * Get the version of the underlying amneziawg-go library.
-     *
-     * @return {@link String} value of the version of the amneziawg-go library.
-     */
-    @Override
-    public String getVersion() {
-        return awgVersion();
-    }
-
-    /**
-     * Change the state of a given {@link Tunnel}, optionally applying a given {@link Config}.
-     *
-     * @param tunnel The tunnel to control the state of.
-     * @param state  The new state for this tunnel. Must be {@code UP}, {@code DOWN}, or
-     *               {@code TOGGLE}.
-     * @param config The configuration for this tunnel, may be null if state is {@code DOWN}.
-     * @return {@link State} of the tunnel after state changes are applied.
-     * @throws Exception Exception raised while changing tunnel state.
-     */
-    @Override
-    public State setState(final Tunnel tunnel, State state, @Nullable final Config config) throws Exception {
-        final State originalState = getState(tunnel);
-        if (state == originalState && tunnel == currentTunnel && config == currentConfig)
-            return originalState;
-        if (state == State.UP) {
-            final Config originalConfig = currentConfig;
-            final Tunnel originalTunnel = currentTunnel;
-            if (currentTunnel != null)
-                setStateInternal(currentTunnel, null, State.DOWN);
-            try {
-                setStateInternal(tunnel, config, state);
-            } catch (final Exception e) {
-                if (originalTunnel != null)
-                    setStateInternal(originalTunnel, originalConfig, State.UP);
-                throw e;
-            }
-        } else if (state == State.DOWN && tunnel == currentTunnel) {
-            setStateInternal(tunnel, null, State.DOWN);
+        if (!(sawDefaultRoute && config.getPeers().size() == 1)) {
+            builder.allowFamily(OsConstants.AF_INET);
+            builder.allowFamily(OsConstants.AF_INET6);
         }
-        return getState(tunnel);
+
+        builder.setMtu(config.getInterface().getMtu().orElse(1280));
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+            builder.setMetered(false);
+
+        service.setUnderlyingNetworks(null);
+        builder.setBlocking(true);
+        try (final ParcelFileDescriptor tun = builder.establish()) {
+            if (tun == null)
+                throw new BackendException(BackendException.Reason.TUN_CREATION_ERROR);
+            Log.d(TAG, "Go backend " + awgVersion());
+            tunnelActionHandler.runPreUp(config.getInterface().getPreUp());
+            String packageName = context.getPackageName();
+            Log.d(TAG, "App package name " + packageName);
+            currentTunnelHandle = awgTurnOn(tunnel.getName(), tun.detachFd(), goConfig, packageName);
+            tunnelActionHandler.runPostUp(config.getInterface().getPostUp());
+        }
+        if (currentTunnelHandle < 0)
+            throw new BackendException(BackendException.Reason.GO_ACTIVATION_ERROR_CODE, currentTunnelHandle);
+
+        service.protect(awgGetSocketV4(currentTunnelHandle));
+        service.protect(awgGetSocketV6(currentTunnelHandle));
     }
 
     @Override
-    public BackendStatus setBackendStatus(BackendStatus backendStatus) throws Exception {
-
-        if ((this.backendStatus instanceof BackendStatus.Inactive && backendStatus instanceof BackendStatus.Inactive) ||
-                (this.backendStatus instanceof BackendStatus.ServiceActive && backendStatus instanceof BackendStatus.ServiceActive) ||
-        (this.backendStatus instanceof BackendStatus.KillSwitchActive currentKillSwitch &&
-                backendStatus instanceof BackendStatus.KillSwitchActive newKillSwitch &&
-                currentKillSwitch.getAllowedIps() == newKillSwitch.getAllowedIps())) {
-            Log.d(TAG, "Backend status already active");
-            return this.backendStatus;
+    protected void stopTunnel(final Tunnel tunnel, @Nullable final Config config) throws Exception {
+        if (currentTunnelHandle == -1) {
+            Log.w(TAG, "Tunnel already down");
+            return;
         }
-
-        if (currentTunnel != null) {
-            Log.d(TAG, "Tunnel running, deferring status change until tunnel is down");
-            this.backendStatus = backendStatus;
-            return backendStatus;
-        }
-
-        // Handle each BackendStatus subclass
-        if (backendStatus instanceof BackendStatus.KillSwitchActive killSwitch) {
-            Log.d(TAG, "Starting kill switch");
-            activateKillSwitch(killSwitch.getAllowedIps());
-        } else if (backendStatus instanceof BackendStatus.ServiceActive) {
-            Log.d(TAG, "Starting service");
-            activateService();
-        } else if (backendStatus instanceof BackendStatus.Inactive) {
-            Log.d(TAG, "Inactive, shutting down");
-            shutdown();
-        } else {
-            throw new IllegalStateException("Unknown BackendStatus subclass: " + backendStatus.getClass().getName());
-        }
-
-        return this.backendStatus;
+        int handleToClose = currentTunnelHandle;
+        tunnelActionHandler.runPreDown(config != null ? config.getInterface().getPreDown() : null);
+        awgTurnOff(handleToClose);
+        tunnelActionHandler.runPostDown(config != null ? config.getInterface().getPostDown() : null);
     }
 
-
-    private void shutdown() throws Exception {
-        Log.d(TAG, "Shutdown..");
-        if(backendStatus instanceof BackendStatus.Inactive) return;
-        Log.d(TAG, "Shutting down vpn service");
-        try {
-            VpnService service = vpnService.get(0, TimeUnit.NANOSECONDS);
-            Log.d(TAG, "Turning off killswitch");
-            if(backendStatus instanceof BackendStatus.KillSwitchActive) service.deactivateKillSwitch();
-            Log.d(TAG, "Stopping self");
-            service.stopSelf();
-        } catch (final TimeoutException | ExecutionException | InterruptedException e) {
-            final Exception be = new BackendException(Reason.SERVICE_NOT_RUNNING);
-            be.initCause(e);
-            throw be;
-        } finally {
-            backendStatus = BackendStatus.Inactive.INSTANCE;
-        }
+    @Override
+    @Nullable
+    protected String getTunnelConfig(final int handle) {
+        return awgGetConfig(handle);
     }
 
-    private void setStateInternal(final Tunnel tunnel, @Nullable final Config config, final State state)
-            throws Exception {
-        Log.i(TAG, "Bringing tunnel " + tunnel.getName() + ' ' + state);
-
-        if (state == State.UP) {
-            if (config == null)
-                throw new BackendException(Reason.TUNNEL_MISSING_CONFIG);
-
-            if (VpnService.prepare(context) != null)
-                throw new BackendException(Reason.VPN_NOT_AUTHORIZED);
-
-            final VpnService service;
-            if (!vpnService.isDone()) {
-                Log.d(TAG, "Requesting to start VpnService");
-                context.startService(new Intent(context, VpnService.class));
-            }
-
-            try {
-                service = vpnService.get(2, TimeUnit.SECONDS);
-            } catch (final TimeoutException e) {
-                final Exception be = new BackendException(Reason.UNABLE_TO_START_VPN);
-                be.initCause(e);
-                throw be;
-            }
-            service.setOwner(this);
-
-            if (currentTunnelHandle != -1) {
-                Log.w(TAG, "Tunnel already up");
-                return;
-            }
-
-
-            List<InetEndpoint> failedEndpoints = new ArrayList<>();
-            for (int i = 0; i < DNS_RESOLUTION_RETRIES; ++i) {
-                failedEndpoints.clear();
-                for (final Peer peer : config.getPeers()) {
-                    Optional<InetEndpoint> epOpt = peer.getEndpoint();
-                    if (epOpt.isEmpty()) continue;
-                    InetEndpoint ep = epOpt.get();
-                    if (ep.getResolved(tunnel.isIpv4ResolutionPreferred()).isEmpty()) {
-                        failedEndpoints.add(ep);
-                    }
-                }
-                if (failedEndpoints.isEmpty()) break;
-                if (i < DNS_RESOLUTION_RETRIES - 1) {
-                    for (InetEndpoint ep : failedEndpoints) {
-                        Log.w(TAG, "DNS host \"" + ep.getHost() + "\" failed (attempt " + (i + 1) + " of " + DNS_RESOLUTION_RETRIES + ")");
-                    }
-                    try {
-                        Thread.sleep(500L * (1 << i));
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new BackendException(Reason.DNS_RESOLUTION_FAILURE, "Interrupted during DNS retry");
-                    }
-                } else {
-                    throw new BackendException(Reason.DNS_RESOLUTION_FAILURE, failedEndpoints.get(0).getHost());
-                }
-            }
-
-            // Build config
-            final String goConfig = config.toAwgUserspaceString(tunnel.isIpv4ResolutionPreferred());
-
-
-            // Create the vpn tunnel with android API
-            final VpnService.Builder builder = service.getBuilder();
-            builder.setSession(tunnel.getName());
-
-            for (final String excludedApplication : config.getInterface().getExcludedApplications())
-                builder.addDisallowedApplication(excludedApplication);
-
-            for (final String includedApplication : config.getInterface().getIncludedApplications())
-                builder.addAllowedApplication(includedApplication);
-
-            for (final InetNetwork addr : config.getInterface().getAddresses())
-                builder.addAddress(addr.getAddress(), addr.getMask());
-
-            for (final InetAddress addr : config.getInterface().getDnsServers())
-                builder.addDnsServer(addr.getHostAddress());
-
-            for (final String dnsSearchDomain : config.getInterface().getDnsSearchDomains())
-                builder.addSearchDomain(dnsSearchDomain);
-
-            boolean sawDefaultRoute = false;
-            for (final Peer peer : config.getPeers()) {
-                for (final InetNetwork addr : peer.getAllowedIps()) {
-                    if (addr.getMask() == 0)
-                        sawDefaultRoute = true;
-                    builder.addRoute(addr.getAddress(), addr.getMask());
-                }
-            }
-
-            // "Kill-switch" semantics
-            if (!(sawDefaultRoute && config.getPeers().size() == 1)) {
-                builder.allowFamily(OsConstants.AF_INET);
-                builder.allowFamily(OsConstants.AF_INET6);
-            }
-
-            builder.setMtu(config.getInterface().getMtu().orElse(1280));
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
-                builder.setMetered(false);
-
-            service.setUnderlyingNetworks(null);
-
-            builder.setBlocking(true);
-            service.deactivateKillSwitch();
-            try (final ParcelFileDescriptor tun = builder.establish()) {
-                if (tun == null)
-                    throw new BackendException(Reason.TUN_CREATION_ERROR);
-                Log.d(TAG, "Go backend " + awgVersion());
-                tunnelActionHandler.runPreUp(config.getInterface().getPreUp());
-                String packageName = context.getPackageName();
-                Log.d(TAG, "App package name " + packageName);
-                currentTunnelHandle = awgTurnOn(tunnel.getName(), tun.detachFd(), goConfig, packageName);
-                tunnelActionHandler.runPostUp(config.getInterface().getPostUp());
-            }
-            if (currentTunnelHandle < 0)
-                throw new BackendException(Reason.GO_ACTIVATION_ERROR_CODE, currentTunnelHandle);
-
-            currentTunnel = tunnel;
-            currentConfig = config;
-
-            service.protect(awgGetSocketV4(currentTunnelHandle));
-            service.protect(awgGetSocketV6(currentTunnelHandle));
-        } else {
-            if (currentTunnelHandle == -1) {
-                Log.w(TAG, "Tunnel already down");
-                return;
-            }
-            int handleToClose = currentTunnelHandle;
-            tunnelActionHandler.runPreDown(currentConfig.getInterface().getPreDown());
-            awgTurnOff(handleToClose);
-            tunnelActionHandler.runPostDown(currentConfig.getInterface().getPostDown());
-            currentTunnel = null;
-            currentTunnelHandle = -1;
-            currentConfig = null;
-            if (backendStatus instanceof BackendStatus.KillSwitchActive killSwitch) {
-                activateKillSwitch(killSwitch.getAllowedIps());
-            } else if (backendStatus instanceof BackendStatus.ServiceActive) {
-                activateService();
-            } else if (backendStatus instanceof BackendStatus.Inactive) {
-                shutdown();
-            }
-        }
-        tunnel.onStateChange(state);
-    }
-
-    private void activateService() {
-        if (!vpnService.isDone()) {
-            Log.d(TAG, "Requesting service activation");
-            context.startService(new Intent(context, VpnService.class));
-        }
-        try {
-            VpnService service = vpnService.get(2, TimeUnit.SECONDS);
-            if(backendStatus instanceof BackendStatus.KillSwitchActive) service.deactivateKillSwitch();
-            Log.d(TAG, "Service is now active");
-            service.setOwner(this);
-            backendStatus = BackendStatus.ServiceActive.INSTANCE;
-        } catch (final TimeoutException | ExecutionException | InterruptedException ignored) {
-            backendStatus = BackendStatus.Inactive.INSTANCE;
-        }
-    }
-
-    private void activateKillSwitch(Collection<String> allowedIps) {
-        try {
-            if (!vpnService.isDone()) {
-                activateService();
-            }
-            VpnService service = vpnService.get(0, TimeUnit.MILLISECONDS);
-            service.activateKillSwitch(allowedIps);
-            backendStatus = new BackendStatus.KillSwitchActive(allowedIps);
-        } catch (final TimeoutException | ExecutionException | InterruptedException ignored) {
-            backendStatus = BackendStatus.Inactive.INSTANCE;
-        }
-    }
-
-    /**
-     * Callback for {@link GoBackend} that is invoked when {@link VpnService} is started by the
-     * system's Always-On VPN mode.
-     */
-    public interface AlwaysOnCallback {
-        void alwaysOnTriggered();
-    }
-
-    /**
-     * {@link android.net.VpnService} implementation for {@link GoBackend}
-     */
-    public static class VpnService extends android.net.VpnService {
-        @Nullable private GoBackend owner;
-
-        @Nullable private ParcelFileDescriptor mInterface;
-
-        public Builder getBuilder() {
-            return new Builder();
-        }
-
-        @Override
-        public void onCreate() {
-            vpnService.complete(this);
-            super.onCreate();
-        }
-
-        @Override
-        public void onDestroy() {
-            if (owner != null) {
-                final Tunnel tunnel = owner.currentTunnel;
-                if (tunnel != null) {
-                    if (owner.currentTunnelHandle != -1)
-                        awgTurnOff(owner.currentTunnelHandle);
-                    owner.currentTunnel = null;
-                    owner.currentTunnelHandle = -1;
-                    owner.currentConfig = null;
-                    owner.backendStatus = BackendStatus.Inactive.INSTANCE;
-                    tunnel.onStateChange(State.DOWN);
-                }
-
-            }
-            vpnService = new CompletableFuture<>();
-            super.onDestroy();
-        }
-
-        void activateKillSwitch(Collection<String> allowedIps) {
-            Builder builder = new Builder();
-            Log.d(TAG, "Starting kill switch with allowedIps: " + allowedIps);
-            builder.setSession("KillSwitchSession")
-                    .addAddress("10.0.0.2", 32)
-                    .addAddress("2001:db8::2", 64);
-            if(allowedIps.isEmpty()) {
-                builder
-                        .addRoute("0.0.0.0", 0);
-            } else allowedIps.forEach((net) -> {
-                Log.d(TAG, "Adding allowedIp: " + net);
-                String[] netSplit = net.split("/");
-                builder.addRoute(netSplit[0], Integer.parseInt(netSplit[1]));
-            });
-            builder.addRoute("::", 0);
-
-            try {
-                if(mInterface != null) mInterface.close();
-                mInterface = builder.establish();
-                if(owner != null) owner.backendStatus = new BackendStatus.KillSwitchActive(allowedIps);
-            } catch (Exception ignored) {
-                Log.e(TAG, "Failed to start kill switch");
-            }
-        }
-
-        void deactivateKillSwitch() {
-            if (mInterface != null) {
-                try {
-                    mInterface.close();
-                    Log.d(TAG, "FD closed");
-                    mInterface = null;
-                    if(owner != null) owner.backendStatus = BackendStatus.ServiceActive.INSTANCE;
-                } catch (IOException e) {
-                    Log.e(TAG, "Failed to stop kill switch");
-                }
-            } else Log.i(TAG, "FD already closed");
-        }
-
-        @Override
-        public int onStartCommand(@Nullable final Intent intent, final int flags, final int startId) {
-            vpnService.complete(this);
-            if (intent == null || intent.getComponent() == null || !intent.getComponent().getPackageName().equals(getPackageName())) {
-                Log.d(TAG, "Service started by Always-on VPN feature");
-                if (alwaysOnCallback != null)
-                    alwaysOnCallback.alwaysOnTriggered();
-            }
-            return super.onStartCommand(intent, flags, startId);
-        }
-
-        public void setOwner(final GoBackend owner) {
-            this.owner = owner;
-            owner.backendStatus = BackendStatus.ServiceActive.INSTANCE;
-        }
+    @Override
+    protected BackendMode setBackendModeInternal(final BackendMode backendMode) {
+        Log.w(TAG, "Backend mode not supported for this backend");
+        return backendMode;
     }
 }

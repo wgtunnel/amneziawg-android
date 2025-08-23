@@ -56,10 +56,30 @@ public final class Interface {
     private final Optional<Long> responsePacketMagicHeader;
     private final Optional<Long> underloadPacketMagicHeader;
     private final Optional<Long> transportPacketMagicHeader;
+    private final Optional<String> i1;
+    private final Optional<String> i2;
+    private final Optional<String> i3;
+    private final Optional<String> i4;
+    private final Optional<String> i5;
+    private final Optional<String> j1;
+    private final Optional<String> j2;
+    private final Optional<String> j3;
+    private final Optional<Integer> itime;
+    private final Set<String> blockedDomains;
+    private final Optional<Boolean> domainBlockingEnabled;
     private final List<String> preUp;
     private final List<String> postUp;
     private final List<String> preDown;
     private final List<String> postDown;
+
+    public enum DnsProtocol {
+        PLAIN, DOH, DOT;
+
+        @Override
+        public String toString() {
+            return name().toLowerCase(Locale.ENGLISH);
+        }
+    }
 
     private Interface(final Builder builder) {
         // Defensively copy to ensure immutability even if the Builder is reused.
@@ -80,10 +100,21 @@ public final class Interface {
         responsePacketMagicHeader = builder.responsePacketMagicHeader;
         underloadPacketMagicHeader = builder.underloadPacketMagicHeader;
         transportPacketMagicHeader = builder.transportPacketMagicHeader;
-        preUp = Collections.unmodifiableList(new ArrayList<>(builder.preUp));
-        postUp = Collections.unmodifiableList(new ArrayList<>(builder.postUp));
-        preDown = Collections.unmodifiableList(new ArrayList<>(builder.preDown));
-        postDown = Collections.unmodifiableList(new ArrayList<>(builder.postDown));
+        i1 = builder.i1;
+        i2 = builder.i2;
+        i3 = builder.i3;
+        i4 = builder.i4;
+        i5 = builder.i5;
+        j1 = builder.j1;
+        j2 = builder.j2;
+        j3 = builder.j3;
+        itime = builder.itime;
+        blockedDomains = Collections.unmodifiableSet(new LinkedHashSet<>(builder.blockedDomains));
+        domainBlockingEnabled = builder.domainBlockingEnabled;
+        preUp = List.copyOf(builder.preUp);
+        postUp = List.copyOf(builder.postUp);
+        preDown = List.copyOf(builder.preDown);
+        postDown = List.copyOf(builder.postDown);
     }
 
     /**
@@ -106,6 +137,12 @@ public final class Interface {
                     break;
                 case "dns":
                     builder.parseDnsServers(attribute.getValue());
+                    break;
+                case "blockeddomains":
+                    builder.parseBlockedDomains(attribute.getValue());
+                    break;
+                case "domainblockingenabled":
+                    builder.parseDomainBlockingEnabled(attribute.getValue());
                     break;
                 case "excludedapplications":
                     builder.parseExcludedApplications(attribute.getValue());
@@ -149,6 +186,33 @@ public final class Interface {
                 case "h4":
                     builder.parseTransportPacketMagicHeader(attribute.getValue());
                     break;
+                case "i1":
+                    builder.parseI1(attribute.getValue());
+                    break;
+                case "i2":
+                    builder.parseI2(attribute.getValue());
+                    break;
+                case "i3":
+                    builder.parseI3(attribute.getValue());
+                    break;
+                case "i4":
+                    builder.parseI4(attribute.getValue());
+                    break;
+                case "i5":
+                    builder.parseI5(attribute.getValue());
+                    break;
+                case "j1":
+                    builder.parseJ1(attribute.getValue());
+                    break;
+                case "j2":
+                    builder.parseJ2(attribute.getValue());
+                    break;
+                case "j3":
+                    builder.parseJ3(attribute.getValue());
+                    break;
+                case "itime":
+                    builder.parseItime(attribute.getValue());
+                    break;
                 case "preup":
                     builder.parsePreUp(attribute.getValue());
                     break;
@@ -171,9 +235,8 @@ public final class Interface {
 
     @Override
     public boolean equals(final Object obj) {
-        if (!(obj instanceof Interface))
+        if (!(obj instanceof Interface other))
             return false;
-        final Interface other = (Interface) obj;
         return addresses.equals(other.addresses)
                 && dnsServers.equals(other.dnsServers)
                 && dnsSearchDomains.equals(other.dnsSearchDomains)
@@ -191,6 +254,17 @@ public final class Interface {
                 && responsePacketMagicHeader.equals(other.responsePacketMagicHeader)
                 && underloadPacketMagicHeader.equals(other.underloadPacketMagicHeader)
                 && transportPacketMagicHeader.equals(other.transportPacketMagicHeader)
+                && i1.equals(other.i1)
+                && i2.equals(other.i2)
+                && i3.equals(other.i3)
+                && i4.equals(other.i4)
+                && i5.equals(other.i5)
+                && j1.equals(other.j1)
+                && j2.equals(other.j2)
+                && j3.equals(other.j3)
+                && itime.equals(other.itime)
+                && blockedDomains.equals(other.blockedDomains)
+                && domainBlockingEnabled.equals(other.domainBlockingEnabled)
                 && preUp.equals(other.preUp)
                 && postUp.equals(other.postUp)
                 && preDown.equals(other.preDown)
@@ -355,6 +429,107 @@ public final class Interface {
         return transportPacketMagicHeader;
     }
 
+    /**
+     * Returns the I1 used for the AmneziaWG interface.
+     *
+     * @return the I1, or {@code Optional.empty()} if none is configured
+     */
+    public Optional<String> getI1() {
+        return i1;
+    }
+
+    /**
+     * Returns the I2 used for the AmneziaWG interface.
+     *
+     * @return the I2, or {@code Optional.empty()} if none is configured
+     */
+    public Optional<String> getI2() {
+        return i2;
+    }
+
+    /**
+     * Returns the I3 used for the AmneziaWG interface.
+     *
+     * @return the I3, or {@code Optional.empty()} if none is configured
+     */
+    public Optional<String> getI3() {
+        return i3;
+    }
+
+    /**
+     * Returns the I4 used for the AmneziaWG interface.
+     *
+     * @return the I4, or {@code Optional.empty()} if none is configured
+     */
+    public Optional<String> getI4() {
+        return i4;
+    }
+
+    /**
+     * Returns the I5 used for the AmneziaWG interface.
+     *
+     * @return the I5, or {@code Optional.empty()} if none is configured
+     */
+    public Optional<String> getI5() {
+        return i5;
+    }
+
+    /**
+     * Returns the J1 used for the AmneziaWG interface.
+     *
+     * @return the J1, or {@code Optional.empty()} if none is configured
+     */
+    public Optional<String> getJ1() {
+        return j1;
+    }
+
+    /**
+     * Returns the J2 used for the AmneziaWG interface.
+     *
+     * @return the J2, or {@code Optional.empty()} if none is configured
+     */
+    public Optional<String> getJ2() {
+        return j2;
+    }
+
+    /**
+     * Returns the J3 used for the AmneziaWG interface.
+     *
+     * @return the J3, or {@code Optional.empty()} if none is configured
+     */
+    public Optional<String> getJ3() {
+        return j3;
+    }
+
+    /**
+     * Returns the Itime used for the AmneziaWG interface.
+     *
+     * @return the Itime, or {@code Optional.empty()} if none is configured
+     */
+    public Optional<Integer> getItime() {
+        return itime;
+    }
+
+
+    /**
+     * Returns the list of blocked domains associated with the interface.
+     *
+     * @return a set of strings
+     */
+    public Set<String> getBlockedDomains() {
+        // The collection is already immutable.
+        return blockedDomains;
+    }
+
+    /**
+     * Returns whether domain blocking is enabled for the interface.
+     *
+     * @return the preferIpv6Dns, or {@code Optional.empty()} if none is configured
+     */
+    public Optional<Boolean> getDomainBlockingEnabled() {
+        return domainBlockingEnabled;
+    }
+
     public List<String> getPreUp() {
         return preUp;
     }
@@ -377,6 +552,7 @@ public final class Interface {
         int hash = 1;
         hash = 31 * hash + addresses.hashCode();
         hash = 31 * hash + dnsServers.hashCode();
+        hash = 31 * hash + dnsSearchDomains.hashCode();
         hash = 31 * hash + excludedApplications.hashCode();
         hash = 31 * hash + includedApplications.hashCode();
         hash = 31 * hash + keyPair.hashCode();
@@ -391,6 +567,17 @@ public final class Interface {
         hash = 31 * hash + responsePacketMagicHeader.hashCode();
         hash = 31 * hash + underloadPacketMagicHeader.hashCode();
         hash = 31 * hash + transportPacketMagicHeader.hashCode();
+        hash = 31 * hash + i1.hashCode();
+        hash = 31 * hash + i2.hashCode();
+        hash = 31 * hash + i3.hashCode();
+        hash = 31 * hash + i4.hashCode();
+        hash = 31 * hash + i5.hashCode();
+        hash = 31 * hash + j1.hashCode();
+        hash = 31 * hash + j2.hashCode();
+        hash = 31 * hash + j3.hashCode();
+        hash = 31 * hash + itime.hashCode();
+        hash = 31 * hash + blockedDomains.hashCode();
+        hash = 31 * hash + domainBlockingEnabled.hashCode();
         hash = 31 * hash + preUp.hashCode();
         hash = 31 * hash + postUp.hashCode();
         hash = 31 * hash + preDown.hashCode();
@@ -428,6 +615,9 @@ public final class Interface {
             dnsServerStrings.addAll(dnsSearchDomains);
             sb.append("DNS = ").append(Attribute.join(dnsServerStrings)).append('\n');
         }
+        if (!blockedDomains.isEmpty())
+            sb.append("BlockedDomains = ").append(Attribute.join(blockedDomains)).append('\n');
+        domainBlockingEnabled.ifPresent(pref -> sb.append("DomainBlockingEnabled = ").append(pref).append('\n'));
         if (!excludedApplications.isEmpty())
             sb.append("ExcludedApplications = ").append(Attribute.join(excludedApplications)).append('\n');
         if (!includedApplications.isEmpty())
@@ -443,6 +633,15 @@ public final class Interface {
         responsePacketMagicHeader.ifPresent(h2 -> sb.append("H2 = ").append(h2).append('\n'));
         underloadPacketMagicHeader.ifPresent(h3 -> sb.append("H3 = ").append(h3).append('\n'));
         transportPacketMagicHeader.ifPresent(h4 -> sb.append("H4 = ").append(h4).append('\n'));
+        i1.ifPresent(i -> sb.append("I1 = ").append(i).append('\n'));
+        i2.ifPresent(i -> sb.append("I2 = ").append(i).append('\n'));
+        i3.ifPresent(i -> sb.append("I3 = ").append(i).append('\n'));
+        i4.ifPresent(i -> sb.append("I4 = ").append(i).append('\n'));
+        i5.ifPresent(i -> sb.append("I5 = ").append(i).append('\n'));
+        j1.ifPresent(j -> sb.append("J1 = ").append(j).append('\n'));
+        j2.ifPresent(j -> sb.append("J2 = ").append(j).append('\n'));
+        j3.ifPresent(j -> sb.append("J3 = ").append(j).append('\n'));
+        itime.ifPresent(it -> sb.append("Itime = ").append(it).append('\n'));
         sb.append("PrivateKey = ").append(keyPair.getPrivateKey().toBase64()).append('\n');
         if(includeScripts) {
             for (final String script : preUp)
@@ -476,7 +675,65 @@ public final class Interface {
         responsePacketMagicHeader.ifPresent(h2 -> sb.append("h2=").append(h2).append('\n'));
         underloadPacketMagicHeader.ifPresent(h3 -> sb.append("h3=").append(h3).append('\n'));
         transportPacketMagicHeader.ifPresent(h4 -> sb.append("h4=").append(h4).append('\n'));
+        i1.ifPresent(i -> sb.append("i1=").append(i).append('\n'));
+        i2.ifPresent(i -> sb.append("i2=").append(i).append('\n'));
+        i3.ifPresent(i -> sb.append("i3=").append(i).append('\n'));
+        i4.ifPresent(i -> sb.append("i4=").append(i).append('\n'));
+        i5.ifPresent(i -> sb.append("i5=").append(i).append('\n'));
+        j1.ifPresent(j -> sb.append("j1=").append(j).append('\n'));
+        j2.ifPresent(j -> sb.append("j2=").append(j).append('\n'));
+        j3.ifPresent(j -> sb.append("j3=").append(j).append('\n'));
+        itime.ifPresent(it -> sb.append("itime=").append(it).append('\n'));
         return sb.toString();
+    }
+
+    /**
+     * Creates a new Interface with updated DNS settings, copying all other fields from this instance.
+     *
+     * @param protocol the new DNS protocol
+     * @param additionalServers the new additional DNS servers
+     * @param preferIpv6 whether to prefer IPv6 DNS
+     * @return a new Interface with the updated DNS settings
+     */
+    public Interface withUpdatedDns(DnsProtocol protocol, Set<String> additionalServers, boolean preferIpv6) {
+        Builder builder = new Builder();
+        builder.addresses.addAll(this.addresses);
+        builder.dnsServers.addAll(this.dnsServers);
+        builder.dnsSearchDomains.addAll(this.dnsSearchDomains);
+        builder.excludedApplications.addAll(this.excludedApplications);
+        builder.includedApplications.addAll(this.includedApplications);
+        builder.keyPair = this.keyPair;
+        builder.listenPort = this.listenPort;
+        builder.mtu = this.mtu;
+        builder.junkPacketCount = this.junkPacketCount;
+        builder.junkPacketMinSize = this.junkPacketMinSize;
+        builder.junkPacketMaxSize = this.junkPacketMaxSize;
+        builder.initPacketJunkSize = this.initPacketJunkSize;
+        builder.responsePacketJunkSize = this.responsePacketJunkSize;
+        builder.initPacketMagicHeader = this.initPacketMagicHeader;
+        builder.responsePacketMagicHeader = this.responsePacketMagicHeader;
+        builder.underloadPacketMagicHeader = this.underloadPacketMagicHeader;
+        builder.transportPacketMagicHeader = this.transportPacketMagicHeader;
+        builder.i1 = this.i1;
+        builder.i2 = this.i2;
+        builder.i3 = this.i3;
+        builder.i4 = this.i4;
+        builder.i5 = this.i5;
+        builder.j1 = this.j1;
+        builder.j2 = this.j2;
+        builder.j3 = this.j3;
+        builder.itime = this.itime;
+        builder.blockedDomains.addAll(additionalServers);
+        builder.domainBlockingEnabled = Optional.of(preferIpv6);
+        builder.preUp.addAll(this.preUp);
+        builder.postUp.addAll(this.postUp);
+        builder.preDown.addAll(this.preDown);
+        builder.postDown.addAll(this.postDown);
+        try {
+            return builder.build();
+        } catch (BadConfigException e) {
+            throw new IllegalStateException("Failed to build updated Interface", e);
+        }
     }
 
     @SuppressWarnings("UnusedReturnValue")
@@ -515,13 +772,35 @@ public final class Interface {
         private Optional<Long> underloadPacketMagicHeader = Optional.empty();
         // Defaults to not present.
         private Optional<Long> transportPacketMagicHeader = Optional.empty();
-        private List<String> preUp = new ArrayList<>();
+        // Defaults to not present.
+        private Optional<String> i1 = Optional.empty();
+        // Defaults to not present.
+        private Optional<String> i2 = Optional.empty();
+        // Defaults to not present.
+        private Optional<String> i3 = Optional.empty();
+        // Defaults to not present.
+        private Optional<String> i4 = Optional.empty();
+        // Defaults to not present.
+        private Optional<String> i5 = Optional.empty();
+        // Defaults to not present.
+        private Optional<String> j1 = Optional.empty();
+        // Defaults to not present.
+        private Optional<String> j2 = Optional.empty();
+        // Defaults to not present.
+        private Optional<String> j3 = Optional.empty();
+        // Defaults to not present.
+        private Optional<Integer> itime = Optional.empty();
+        // Defaults to an empty set.
+        private final Set<String> blockedDomains = new LinkedHashSet<>();
+        // Defaults to not present.
+        private Optional<Boolean> domainBlockingEnabled = Optional.empty();
+        private final List<String> preUp = new ArrayList<>();
         // Defaults to empty list
-        private List<String> postUp = new ArrayList<>();
+        private final List<String> postUp = new ArrayList<>();
         // Defaults to empty list
-        private List<String> preDown = new ArrayList<>();
+        private final List<String> preDown = new ArrayList<>();
         // Defaults to empty list
-        private List<String> postDown = new ArrayList<>();
+        private final List<String> postDown = new ArrayList<>();
 
 
         public Builder addAddress(final InetNetwork address) {
@@ -608,6 +887,27 @@ public final class Interface {
                 return this;
             } catch (final ParseException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.DNS, e);
+            }
+        }
+
+        public Builder parseBlockedDomains(final CharSequence blockedDomains) {
+            for (final String domain : Attribute.split(blockedDomains)) {
+                addBlockedDomains(domain);
+            }
+            return this;
+        }
+
+        private Builder addBlockedDomains(final String dnsServer) {
+            blockedDomains.add(dnsServer);
+            return this;
+        }
+
+        public Builder parseDomainBlockingEnabled(final String domainBlockingEnabled) throws BadConfigException {
+            try {
+                this.domainBlockingEnabled = Optional.of(Boolean.parseBoolean(domainBlockingEnabled));
+                return this;
+            } catch (Exception e) {
+                throw new BadConfigException(Section.INTERFACE, Location.TOP_LEVEL, Reason.INVALID_VALUE, domainBlockingEnabled);
             }
         }
 
@@ -699,12 +999,60 @@ public final class Interface {
                 throw new BadConfigException(Section.INTERFACE, Location.UNDERLOAD_PACKET_MAGIC_HEADER, underloadPacketMagicHeader, e);
             }
         }
-        
+
         public Builder parseTransportPacketMagicHeader(final String transportPacketMagicHeader) throws BadConfigException {
             try {
                 return setTransportPacketMagicHeader(Long.parseLong(transportPacketMagicHeader));
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.TRANSPORT_PACKET_MAGIC_HEADER, transportPacketMagicHeader, e);
+            }
+        }
+
+        public Builder parseI1(final String i1) {
+            this.i1 = Optional.of(i1);
+            return this;
+        }
+
+        public Builder parseI2(final String i2) {
+            this.i2 = Optional.of(i2);
+            return this;
+        }
+
+        public Builder parseI3(final String i3) {
+            this.i3 = Optional.of(i3);
+            return this;
+        }
+
+        public Builder parseI4(final String i4) {
+            this.i4 = Optional.of(i4);
+            return this;
+        }
+
+        public Builder parseI5(final String i5) {
+            this.i5 = Optional.of(i5);
+            return this;
+        }
+
+        public Builder parseJ1(final String j1) {
+            this.j1 = Optional.of(j1);
+            return this;
+        }
+
+        public Builder parseJ2(final String j2) {
+            this.j2 = Optional.of(j2);
+            return this;
+        }
+
+        public Builder parseJ3(final String j3) {
+            this.j3 = Optional.of(j3);
+            return this;
+        }
+
+        public Builder parseItime(final String itime) throws BadConfigException {
+            try {
+                return setItime(Integer.parseInt(itime));
+            } catch (final NumberFormatException e) {
+                throw new BadConfigException(Section.INTERFACE, Location.ITIME, itime, e);
             }
         }
 
@@ -827,6 +1175,54 @@ public final class Interface {
                 throw new BadConfigException(Section.INTERFACE, Location.TRANSPORT_PACKET_MAGIC_HEADER,
                         Reason.INVALID_VALUE, String.valueOf(transportPacketMagicHeader));
             this.transportPacketMagicHeader = transportPacketMagicHeader == 0 ? Optional.empty() : Optional.of(transportPacketMagicHeader);
+            return this;
+        }
+
+        public Builder setI1(final String i1) {
+            this.i1 = i1.isEmpty() ? Optional.empty() : Optional.of(i1);
+            return this;
+        }
+
+        public Builder setI2(final String i2) {
+            this.i2 = i2.isEmpty() ? Optional.empty() : Optional.of(i2);
+            return this;
+        }
+
+        public Builder setI3(final String i3) {
+            this.i3 = i3.isEmpty() ? Optional.empty() : Optional.of(i3);
+            return this;
+        }
+
+        public Builder setI4(final String i4) {
+            this.i4 = i4.isEmpty() ? Optional.empty() : Optional.of(i4);
+            return this;
+        }
+
+        public Builder setI5(final String i5) {
+            this.i5 = i5.isEmpty() ? Optional.empty() : Optional.of(i5);
+            return this;
+        }
+
+        public Builder setJ1(final String j1) {
+            this.j1 = j1.isEmpty() ? Optional.empty() : Optional.of(j1);
+            return this;
+        }
+
+        public Builder setJ2(final String j2) {
+            this.j2 = j2.isEmpty() ? Optional.empty() : Optional.of(j2);
+            return this;
+        }
+
+        public Builder setJ3(final String j3) {
+            this.j3 = j3.isEmpty() ? Optional.empty() : Optional.of(j3);
+            return this;
+        }
+
+        public Builder setItime(final int itime) throws BadConfigException {
+            if (itime < 0)
+                throw new BadConfigException(Section.INTERFACE, Location.ITIME,
+                        Reason.INVALID_VALUE, String.valueOf(itime));
+            this.itime = itime == 0 ? Optional.empty() : Optional.of(itime);
             return this;
         }
     }

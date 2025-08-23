@@ -12,6 +12,9 @@ plugins {
 }
 
 android {
+
+    ndkVersion = "28.2.13676358"  // Pins the NDK to r28c for consistent builds and 16KB support
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -63,12 +66,18 @@ android {
 }
 
 dependencies {
+    implementation(project(":hevtunnel"))
+
     implementation(libs.androidx.annotation)
-    implementation(libs.androidx.collection)
+    runtimeOnly(libs.androidx.collection)
     compileOnly(libs.jsr305)
     testImplementation(libs.junit)
 
     implementation(libs.relinker)
+
+    //dns
+    implementation(libs.okhttp.dnsoverhttps)
+    implementation(libs.okhttp)
 }
 
 publishing {

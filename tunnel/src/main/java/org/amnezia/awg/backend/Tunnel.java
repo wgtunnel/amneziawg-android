@@ -5,8 +5,11 @@
 
 package org.amnezia.awg.backend;
 
+import androidx.annotation.Nullable;
+import org.amnezia.awg.config.DnsSettings;
 import org.amnezia.awg.util.NonNullForAll;
 
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
@@ -29,6 +32,12 @@ public interface Tunnel {
      */
     String getName();
 
+    /**
+     * React to a change in state of the tunnel. Should only be directly called by Backend.
+     *
+     * @param newState The new state of the tunnel.
+     */
+    void onStateChange(State newState);
 
     /**
      * Prefer IPv4 host resolution.
@@ -36,13 +45,6 @@ public interface Tunnel {
      * @return true if ipv4 is preferred.
      */
     Boolean isIpv4ResolutionPreferred();
-
-    /**
-     * React to a change in state of the tunnel. Should only be directly called by Backend.
-     *
-     * @param newState The new state of the tunnel.
-     */
-    void onStateChange(State newState);
 
     /**
      * Enum class to represent all possible states of a {@link Tunnel}.

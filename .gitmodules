@@ -4,3 +4,6 @@
 [submodule "tunnel/tools/elf-cleaner"]
 	path = tunnel/tools/elf-cleaner
 	url = https://github.com/termux/termux-elf-cleaner
+[submodule "hevtunnel/src/main/jni/hev-socks5-tunnel"]
+	path = hevtunnel/src/main/jni/hev-socks5-tunnel
+	url = https://github.com/heiher/hev-socks5-tunnel
