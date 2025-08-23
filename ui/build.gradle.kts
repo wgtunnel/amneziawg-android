@@ -63,7 +63,6 @@ android {
 }
 
 dependencies {
-    api("org.amnezia.awg:hevtunnel:1.0.0")
     implementation(libs.androidx.activity.ktx)
     implementation(libs.androidx.annotation)
     implementation(libs.androidx.appcompat)

@@ -9,6 +9,9 @@ android {
     namespace = "org.amnezia.awg.hevtunnel"
     compileSdk = 36
 
+    ndkVersion = "28.2.13676358"  // Pins the NDK to r28c for consistent builds and 16KB support
+
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -68,7 +71,7 @@ dependencies {
 publishing {
     publications {
         register<MavenPublication>("release") {
-            groupId = "org.amnezia.awg"
+            groupId = "com.zaneschepke"
             artifactId = "hevtunnel"
             version = "1.0.0" // Set appropriate version
             afterEvaluate {
