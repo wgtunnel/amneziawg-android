@@ -1,8 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-    `maven-publish`
-    signing
 }
 
 android {
@@ -68,51 +66,3 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 }
 
-publishing {
-    publications {
-        register<MavenPublication>("release") {
-            groupId = "com.zaneschepke"
-            artifactId = "hevtunnel"
-            version = "1.0.0" // Set appropriate version
-            afterEvaluate {
-                from(components["release"])
-            }
-            pom {
-                name.set("Hev SOCKS5 Tunnel Library")
-                description.set("Embeddable tun2socks wrapper library for Android")
-                url.set("https://amnezia.org/")
-
-                licenses {
-                    license {
-                        name.set("The Apache Software License, Version 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
-                        distribution.set("repo")
-                    }
-                }
-                scm {
-                    connection.set("scm:git:https://github.com/zaneschepke/amneziawg-android")
-                    developerConnection.set("scm:git:https://github.com/zaneschepke/amneziawg-android")
-                    url.set("https://github.com/zaneschepke/amneziawg-android")
-                }
-                developers {
-                    organization {
-                        name.set("Zane Schepke")
-                        url.set("https://zaneschepke.com")
-                    }
-                    developer {
-                        name.set("Zane Schepke")
-                        email.set("support@zaneschepke.com")
-                    }
-                }
-            }
-        }
-    }
-}
-
-signing {
-    useInMemoryPgpKeys(
-        getLocalProperty("SECRET_KEY") ?: System.getenv("SECRET_KEY"),
-        getLocalProperty("PASSWORD") ?: System.getenv("PASSWORD")
-    )
-    sign(publishing.publications)
-}
