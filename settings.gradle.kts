@@ -28,6 +28,7 @@ rootProject.name = "amneziawg-android"
 
 include(":tunnel")
 include(":ui")
+include(":hevtunnel")
 
 configure<SettingsExtension> {
     buildToolsVersion = "35.0.0"

@@ -46,7 +46,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '^1.24.5'
+          go-version: '^1.25.0'
 
       - name: Install util-linux (if needed)
         run: sudo apt-get update && sudo apt-get install -y util-linux
