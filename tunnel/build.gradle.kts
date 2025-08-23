@@ -66,7 +66,8 @@ android {
 }
 
 dependencies {
-    implementation(project(":hevtunnel"))
+
+    implementation(libs.hev.tunnel)
 
     implementation(libs.androidx.annotation)
     runtimeOnly(libs.androidx.collection)

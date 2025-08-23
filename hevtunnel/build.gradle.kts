@@ -1,12 +1,17 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-    id("maven-publish")
+    `maven-publish`
+    signing
 }
 
 android {
     namespace = "org.amnezia.awg.hevtunnel"
     compileSdk = 36
+    version= "1.0.0"
+
+    ndkVersion = "28.2.13676358"  // Pins the NDK to r28c for consistent builds and 16KB support
+
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -24,7 +29,6 @@ android {
         consumerProguardFiles("consumer-rules.pro")
         externalNativeBuild {
             ndkBuild {
-                targets("hev-socks5-tunnel")
                 arguments.add("APP_CFLAGS+=-DPKGNAME=org/amnezia/awg/hevtunnel -ffile-prefix-map=${rootDir}=.")
                 arguments.add("APP_LDFLAGS+=-Wl,--build-id=none")
             }
@@ -67,16 +71,16 @@ dependencies {
 publishing {
     publications {
         register<MavenPublication>("release") {
-            groupId = "org.amnezia.awg"
+            groupId = "com.zaneschepke"
             artifactId = "hevtunnel"
-            version = "1.0.0" // Set appropriate version
+            version = "1.0.0"
             afterEvaluate {
                 from(components["release"])
             }
             pom {
-                name.set("Amnezia WG Tunnel Library")
-                description.set("Embeddable tunnel library for WG for Android")
-                url.set("https://amnezia.org/")
+                name.set("Hev SOCKS5 Tunnel Library")
+                description.set("Embeddable tun2socks library for Android")
+                url.set("https://wgtunnel.com/")
 
                 licenses {
                     license {
@@ -104,3 +108,12 @@ publishing {
         }
     }
 }
+
+signing {
+    useInMemoryPgpKeys(
+        getLocalProperty("SECRET_KEY") ?: System.getenv("SECRET_KEY"),
+        getLocalProperty("PASSWORD") ?: System.getenv("PASSWORD")
+    )
+    sign(publishing.publications)
+}
+
