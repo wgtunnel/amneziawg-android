@@ -1,0 +1,2 @@
+-keep class org.amnezia.awg.backend.AbstractBackend$VpnService { *; }
+-keep interface org.amnezia.awg.backend.SocketProtector { *; }

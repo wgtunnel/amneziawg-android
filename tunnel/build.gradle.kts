@@ -15,6 +15,11 @@ android {
 
     ndkVersion = "28.2.13676358"  // Pins the NDK to r28c for consistent builds and 16KB support
 
+    defaultConfig {
+        minSdk = 24
+        consumerProguardFiles("consumer-rules.pro")
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

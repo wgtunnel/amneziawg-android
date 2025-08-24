@@ -341,7 +341,11 @@ public abstract class AbstractBackend implements Backend {
         }
 
         public void shutdown() {
-            stopKillSwitch();
+            try {
+                stopKillSwitch();
+            } catch (Exception e) {
+                Log.w(TAG, e);
+            }
         }
 
         private void handleDestroy(final AbstractBackend owner) {
@@ -373,7 +377,11 @@ public abstract class AbstractBackend implements Backend {
 
         public void setOwner(final AbstractBackend owner) {
             this.owner = owner;
-            if(owner instanceof ProxyGoBackend) awgSetSocketProtector(this);
+            try {
+                if(owner instanceof ProxyGoBackend) awgSetSocketProtector(this);
+            } catch (final Exception e) {
+                Log.w(TAG, e);
+            }
         }
 
         protected void activateKillSwitch(Set<String> allowedIps) throws Exception {
@@ -398,7 +406,7 @@ public abstract class AbstractBackend implements Backend {
 
             fd = builder.establish();
             if (fd == null) {
-                throw new IOException("Failed to establish VPN interface");
+                throw new BackendException(BackendException.Reason.VPN_NOT_AUTHORIZED);
             }
 
             hevStartThread = new Thread(() -> {
@@ -414,9 +422,15 @@ public abstract class AbstractBackend implements Backend {
         @Override
         public int bypass(int fd) {
             Log.d(TAG, "Bypassing VPN fd: " + fd);
-            int isProtected = protect(fd) ? 1 : 0;
+            int bypassed;
+            try {
+                bypassed = protect(fd) ? 1 : 0;
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to protect VPN fd", e);
+                bypassed = 0;
+            }
             Log.d(TAG, "Socked protected result: " + fd);
-            return isProtected;
+            return bypassed;
         }
 
         private void stopKillSwitch() {

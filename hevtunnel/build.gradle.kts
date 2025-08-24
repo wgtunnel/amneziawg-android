@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "org.amnezia.awg.hevtunnel"
     compileSdk = 36
-    version= "1.0.0"
+    version= "1.0.1"
 
     ndkVersion = "28.2.13676358"  // Pins the NDK to r28c for consistent builds and 16KB support
 
@@ -73,7 +73,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "com.zaneschepke"
             artifactId = "hevtunnel"
-            version = "1.0.0"
+            version = "1.0.1"
             afterEvaluate {
                 from(components["release"])
             }
