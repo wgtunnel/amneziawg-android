@@ -50,6 +50,9 @@ func awgTurnOn(interfaceName string, tunFd int32, settings string, pkgName strin
 	if err != nil {
 		shared.LogError(tag,"Invalid config file", err)
 		unix.Close(int(tunFd))
+		if tunnel != nil {
+			tunnel.Close()
+		}
 		return -1
 	}
 

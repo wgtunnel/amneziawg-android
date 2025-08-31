@@ -28,7 +28,7 @@ require (
 
 replace github.com/amnezia-vpn/amneziawg-go => github.com/wgtunnel/amneziawg-go v0.0.0-20250823024331-438e15eb711b
 
-replace github.com/artem-russkikh/wireproxy-awg => github.com/wgtunnel/wireproxy-awg v0.0.0-20250823024623-c00760b6f1f7
+replace github.com/artem-russkikh/wireproxy-awg => github.com/wgtunnel/wireproxy-awg v0.0.0-20250831100424-af89f872057a
 
 // local dev
 //replace github.com/amnezia-vpn/amneziawg-go => ../../../../amneziawg-go

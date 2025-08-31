@@ -17,6 +17,7 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -641,7 +642,7 @@ public final class Interface {
         j1.ifPresent(j -> sb.append("J1 = ").append(j).append('\n'));
         j2.ifPresent(j -> sb.append("J2 = ").append(j).append('\n'));
         j3.ifPresent(j -> sb.append("J3 = ").append(j).append('\n'));
-        itime.ifPresent(it -> sb.append("Itime = ").append(it).append('\n'));
+        itime.ifPresent(it -> sb.append("ITime = ").append(it).append('\n'));
         sb.append("PrivateKey = ").append(keyPair.getPrivateKey().toBase64()).append('\n');
         if(includeScripts) {
             for (final String script : preUp)
@@ -840,6 +841,42 @@ public final class Interface {
             if (!includedApplications.isEmpty() && !excludedApplications.isEmpty())
                 throw new BadConfigException(Section.INTERFACE, Location.INCLUDED_APPLICATIONS,
                         Reason.INVALID_KEY, null);
+
+            // Validate AmneziaWG parameters (inter-dependent checks)
+            int jc = junkPacketCount.orElse(0);
+            int jmin = junkPacketMinSize.orElse(0);
+            int jmax = junkPacketMaxSize.orElse(0);
+            int s1 = initPacketJunkSize.orElse(0);
+            int s2 = responsePacketJunkSize.orElse(0);
+            long h1 = initPacketMagicHeader.orElse(0L);
+            long h2 = responsePacketMagicHeader.orElse(0L);
+            long h3 = underloadPacketMagicHeader.orElse(0L);
+            long h4 = transportPacketMagicHeader.orElse(0L);
+            int it = itime.orElse(0);
+
+            if (jc > 0 && jmin > jmax) {
+                throw new BadConfigException(Section.INTERFACE, Location.JUNK_PACKET_MIN_SIZE,
+                        Reason.INVALID_VALUE, "Jmin > Jmax");
+            }
+            if (148 + s1 == 92 + s2) {
+                throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_JUNK_SIZE,
+                        Reason.INVALID_VALUE, "S1 + 148 == S2 + 92");
+            }
+            boolean anyHeaderSet = initPacketMagicHeader.isPresent() || responsePacketMagicHeader.isPresent() ||
+                    underloadPacketMagicHeader.isPresent() || transportPacketMagicHeader.isPresent();
+            if (anyHeaderSet) {
+                if (!(initPacketMagicHeader.isPresent() && responsePacketMagicHeader.isPresent() &&
+                        underloadPacketMagicHeader.isPresent() && transportPacketMagicHeader.isPresent())) {
+                    throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_MAGIC_HEADER,
+                            Reason.MISSING_ATTRIBUTE, "All H1-H4 must be set if any are present");
+                }
+                Set<Long> seen = new HashSet<>();
+                if (!seen.add(h1) || !seen.add(h2) || !seen.add(h3) || !seen.add(h4)) {
+                    throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_MAGIC_HEADER,
+                            Reason.INVALID_VALUE, "H1-H4 must be unique");
+                }
+            }
+
             return new Interface(this);
         }
 
@@ -921,7 +958,11 @@ public final class Interface {
 
         public Builder parseListenPort(final String listenPort) throws BadConfigException {
             try {
-                return setListenPort(Integer.parseInt(listenPort));
+                int lp = Integer.parseInt(listenPort);
+                if (lp < MIN_UDP_PORT || lp > MAX_UDP_PORT) {
+                    throw new BadConfigException(Section.INTERFACE, Location.LISTEN_PORT, Reason.INVALID_VALUE, listenPort);
+                }
+                return setListenPort(lp);
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.LISTEN_PORT, listenPort, e);
             }
@@ -929,7 +970,11 @@ public final class Interface {
 
         public Builder parseMtu(final String mtu) throws BadConfigException {
             try {
-                return setMtu(Integer.parseInt(mtu));
+                int m = Integer.parseInt(mtu);
+                if (m < 0) {
+                    throw new BadConfigException(Section.INTERFACE, Location.MTU, Reason.INVALID_VALUE, mtu);
+                }
+                return setMtu(m);
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.MTU, mtu, e);
             }
@@ -937,7 +982,11 @@ public final class Interface {
 
         public Builder parseJunkPacketCount(final String junkPacketCount) throws BadConfigException {
             try {
-                return setJunkPacketCount(Integer.parseInt(junkPacketCount));
+                int jc = Integer.parseInt(junkPacketCount);
+                if (jc < 0 || jc > 10) {
+                    throw new BadConfigException(Section.INTERFACE, Location.JUNK_PACKET_COUNT, Reason.INVALID_VALUE, junkPacketCount);
+                }
+                return setJunkPacketCount(jc);
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.JUNK_PACKET_COUNT, junkPacketCount, e);
             }
@@ -945,7 +994,11 @@ public final class Interface {
 
         public Builder parseJunkPacketMinSize(final String junkPacketMinSize) throws BadConfigException {
             try {
-                return setJunkPacketMinSize(Integer.parseInt(junkPacketMinSize));
+                int jmin = Integer.parseInt(junkPacketMinSize);
+                if (jmin < 0 || jmin > 1024) {
+                    throw new BadConfigException(Section.INTERFACE, Location.JUNK_PACKET_MIN_SIZE, Reason.INVALID_VALUE, junkPacketMinSize);
+                }
+                return setJunkPacketMinSize(jmin);
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.JUNK_PACKET_MIN_SIZE, junkPacketMinSize, e);
             }
@@ -953,7 +1006,11 @@ public final class Interface {
 
         public Builder parseJunkPacketMaxSize(final String junkPacketMaxSize) throws BadConfigException {
             try {
-                return setJunkPacketMaxSize(Integer.parseInt(junkPacketMaxSize));
+                int jmax = Integer.parseInt(junkPacketMaxSize);
+                if (jmax < 0 || jmax > 1024) {
+                    throw new BadConfigException(Section.INTERFACE, Location.JUNK_PACKET_MAX_SIZE, Reason.INVALID_VALUE, junkPacketMaxSize);
+                }
+                return setJunkPacketMaxSize(jmax);
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.JUNK_PACKET_MAX_SIZE, junkPacketMaxSize, e);
             }
@@ -961,7 +1018,11 @@ public final class Interface {
 
         public Builder parseInitPacketJunkSize(final String initPacketJunkSize) throws BadConfigException {
             try {
-                return setInitPacketJunkSize(Integer.parseInt(initPacketJunkSize));
+                int s1 = Integer.parseInt(initPacketJunkSize);
+                if (s1 < 0 || s1 > 64) {
+                    throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_JUNK_SIZE, Reason.INVALID_VALUE, initPacketJunkSize);
+                }
+                return setInitPacketJunkSize(s1);
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_JUNK_SIZE, initPacketJunkSize, e);
             }
@@ -969,7 +1030,11 @@ public final class Interface {
 
         public Builder parseResponsePacketJunkSize(final String responsePacketJunkSize) throws BadConfigException {
             try {
-                return setResponsePacketJunkSize(Integer.parseInt(responsePacketJunkSize));
+                int s2 = Integer.parseInt(responsePacketJunkSize);
+                if (s2 < 0 || s2 > 64) {
+                    throw new BadConfigException(Section.INTERFACE, Location.RESPONSE_PACKET_JUNK_SIZE, Reason.INVALID_VALUE, responsePacketJunkSize);
+                }
+                return setResponsePacketJunkSize(s2);
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.RESPONSE_PACKET_JUNK_SIZE, responsePacketJunkSize, e);
             }
@@ -977,7 +1042,11 @@ public final class Interface {
 
         public Builder parseInitPacketMagicHeader(final String initPacketMagicHeader) throws BadConfigException {
             try {
-                return setInitPacketMagicHeader(Long.parseLong(initPacketMagicHeader));
+                long h1 = Long.parseLong(initPacketMagicHeader);
+                if (h1 < 0) {
+                    throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, initPacketMagicHeader);
+                }
+                return setInitPacketMagicHeader(h1);
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_MAGIC_HEADER, initPacketMagicHeader, e);
             }
@@ -985,8 +1054,11 @@ public final class Interface {
 
         public Builder parseResponsePacketMagicHeader(final String responsePacketMagicHeader) throws BadConfigException {
             try {
-
-                return setResponsePacketMagicHeader(Long.parseLong(responsePacketMagicHeader));
+                long h2 = Long.parseLong(responsePacketMagicHeader);
+                if (h2 < 0) {
+                    throw new BadConfigException(Section.INTERFACE, Location.RESPONSE_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, responsePacketMagicHeader);
+                }
+                return setResponsePacketMagicHeader(h2);
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.RESPONSE_PACKET_MAGIC_HEADER, responsePacketMagicHeader, e);
             }
@@ -994,7 +1066,11 @@ public final class Interface {
 
         public Builder parseUnderloadPacketMagicHeader(final String underloadPacketMagicHeader) throws BadConfigException {
             try {
-                return setUnderloadPacketMagicHeader(Long.parseLong(underloadPacketMagicHeader));
+                long h3 = Long.parseLong(underloadPacketMagicHeader);
+                if (h3 < 0) {
+                    throw new BadConfigException(Section.INTERFACE, Location.UNDERLOAD_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, underloadPacketMagicHeader);
+                }
+                return setUnderloadPacketMagicHeader(h3);
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.UNDERLOAD_PACKET_MAGIC_HEADER, underloadPacketMagicHeader, e);
             }
@@ -1002,55 +1078,55 @@ public final class Interface {
 
         public Builder parseTransportPacketMagicHeader(final String transportPacketMagicHeader) throws BadConfigException {
             try {
-                return setTransportPacketMagicHeader(Long.parseLong(transportPacketMagicHeader));
+                long h4 = Long.parseLong(transportPacketMagicHeader);
+                if (h4 < 0) {
+                    throw new BadConfigException(Section.INTERFACE, Location.TRANSPORT_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, transportPacketMagicHeader);
+                }
+                return setTransportPacketMagicHeader(h4);
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.TRANSPORT_PACKET_MAGIC_HEADER, transportPacketMagicHeader, e);
             }
         }
 
         public Builder parseI1(final String i1) {
-            this.i1 = Optional.of(i1);
-            return this;
+            return setI1(i1);
         }
 
         public Builder parseI2(final String i2) {
-            this.i2 = Optional.of(i2);
-            return this;
+            return setI2(i2);
         }
 
         public Builder parseI3(final String i3) {
-            this.i3 = Optional.of(i3);
-            return this;
+            return setI3(i3);
         }
 
         public Builder parseI4(final String i4) {
-            this.i4 = Optional.of(i4);
-            return this;
+            return setI4(i4);
         }
 
         public Builder parseI5(final String i5) {
-            this.i5 = Optional.of(i5);
-            return this;
+            return setI5(i5);
         }
 
         public Builder parseJ1(final String j1) {
-            this.j1 = Optional.of(j1);
-            return this;
+            return setJ1(j1);
         }
 
         public Builder parseJ2(final String j2) {
-            this.j2 = Optional.of(j2);
-            return this;
+            return setJ2(j2);
         }
 
         public Builder parseJ3(final String j3) {
-            this.j3 = Optional.of(j3);
-            return this;
+            return setJ3(j3);
         }
 
         public Builder parseItime(final String itime) throws BadConfigException {
             try {
-                return setItime(Integer.parseInt(itime));
+                int it = Integer.parseInt(itime);
+                if (it < 0) {
+                    throw new BadConfigException(Section.INTERFACE, Location.ITIME, Reason.INVALID_VALUE, itime);
+                }
+                return setItime(it);
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.ITIME, itime, e);
             }
