@@ -874,7 +874,7 @@ public final class Interface {
         public Builder parseJunkPacketCount(final String junkPacketCount) throws BadConfigException {
             try {
                 int jc = Integer.parseInt(junkPacketCount);
-                if (jc < 0 || jc > 10) {
+                if (jc < 0 || jc > 200) {
                     throw new BadConfigException(Section.INTERFACE, Location.JUNK_PACKET_COUNT, Reason.INVALID_VALUE, junkPacketCount);
                 }
                 return setJunkPacketCount(jc);
@@ -886,7 +886,7 @@ public final class Interface {
         public Builder parseJunkPacketMinSize(final String junkPacketMinSize) throws BadConfigException {
             try {
                 int jmin = Integer.parseInt(junkPacketMinSize);
-                if (jmin < 0 || jmin > 1024) {
+                if (jmin < 0 || jmin > 1280) {
                     throw new BadConfigException(Section.INTERFACE, Location.JUNK_PACKET_MIN_SIZE, Reason.INVALID_VALUE, junkPacketMinSize);
                 }
                 return setJunkPacketMinSize(jmin);
@@ -898,7 +898,7 @@ public final class Interface {
         public Builder parseJunkPacketMaxSize(final String junkPacketMaxSize) throws BadConfigException {
             try {
                 int jmax = Integer.parseInt(junkPacketMaxSize);
-                if (jmax < 0 || jmax > 1024) {
+                if (jmax < 0 || jmax > 1280) {
                     throw new BadConfigException(Section.INTERFACE, Location.JUNK_PACKET_MAX_SIZE, Reason.INVALID_VALUE, junkPacketMaxSize);
                 }
                 return setJunkPacketMaxSize(jmax);
@@ -910,7 +910,7 @@ public final class Interface {
         public Builder parseInitPacketJunkSize(final String initPacketJunkSize) throws BadConfigException {
             try {
                 int s1 = Integer.parseInt(initPacketJunkSize);
-                if (s1 < 0 || s1 > 64) {
+                if (s1 < 0 || s1 > 1280) {
                     throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_JUNK_SIZE, Reason.INVALID_VALUE, initPacketJunkSize);
                 }
                 return setInitPacketJunkSize(s1);
@@ -922,7 +922,7 @@ public final class Interface {
         public Builder parseResponsePacketJunkSize(final String responsePacketJunkSize) throws BadConfigException {
             try {
                 int s2 = Integer.parseInt(responsePacketJunkSize);
-                if (s2 < 0 || s2 > 64) {
+                if (s2 < 0 || s2 > 1280) {
                     throw new BadConfigException(Section.INTERFACE, Location.RESPONSE_PACKET_JUNK_SIZE, Reason.INVALID_VALUE, responsePacketJunkSize);
                 }
                 return setResponsePacketJunkSize(s2);
@@ -933,9 +933,15 @@ public final class Interface {
 
         public Builder parseCookieReplyPacketJunkSize(final String cookieReplyPacketJunkSize) throws BadConfigException {
             try {
+<<<<<<< HEAD
                 long size = Long.parseLong(cookieReplyPacketJunkSize);
                 if (size < 0) {
                     throw new BadConfigException(Section.INTERFACE, Location.COOKIE_REPLY_PACKET_JUNK_SIZE, Reason.INVALID_VALUE, size);
+=======
+                long h1 = Long.parseLong(initPacketMagicHeader);
+                if (h1 <= 0 || h1 > 4294967295L) {
+                    throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, initPacketMagicHeader);
+>>>>>>> e2fbc75 (fix: parser issues go libs)
                 }
                 return setCookieReplyPacketJunkSize(size);
             } catch (final NumberFormatException e) {
@@ -965,28 +971,61 @@ public final class Interface {
         }
 
         public Builder parseResponsePacketMagicHeader(final String responsePacketMagicHeader) throws BadConfigException {
+<<<<<<< HEAD
             if (responsePacketMagicHeader == null || responsePacketMagicHeader.trim().isEmpty()) {
                 this.responsePacketMagicHeader = Optional.empty();
             } else {
                 this.responsePacketMagicHeader = Optional.of(responsePacketMagicHeader.trim());
+=======
+            try {
+                long h2 = Long.parseLong(responsePacketMagicHeader);
+                if (h2 <= 0 || h2 > 4294967295L) {
+                    throw new BadConfigException(Section.INTERFACE, Location.RESPONSE_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, responsePacketMagicHeader);
+                }
+                return setResponsePacketMagicHeader(h2);
+            } catch (final NumberFormatException e) {
+                throw new BadConfigException(Section.INTERFACE, Location.RESPONSE_PACKET_MAGIC_HEADER, responsePacketMagicHeader, e);
+>>>>>>> e2fbc75 (fix: parser issues go libs)
             }
             return this;
         }
 
         public Builder parseUnderloadPacketMagicHeader(final String underloadPacketMagicHeader) throws BadConfigException {
+<<<<<<< HEAD
             if (underloadPacketMagicHeader == null || underloadPacketMagicHeader.trim().isEmpty()) {
                 this.underloadPacketMagicHeader = Optional.empty();
             } else {
                 this.underloadPacketMagicHeader = Optional.of(underloadPacketMagicHeader.trim());
+=======
+            try {
+                long h3 = Long.parseLong(underloadPacketMagicHeader);
+                if (h3 <= 0 || h3 > 4294967295L) {
+                    throw new BadConfigException(Section.INTERFACE, Location.UNDERLOAD_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, underloadPacketMagicHeader);
+                }
+                return setUnderloadPacketMagicHeader(h3);
+            } catch (final NumberFormatException e) {
+                throw new BadConfigException(Section.INTERFACE, Location.UNDERLOAD_PACKET_MAGIC_HEADER, underloadPacketMagicHeader, e);
+>>>>>>> e2fbc75 (fix: parser issues go libs)
             }
             return this;
         }
 
         public Builder parseTransportPacketMagicHeader(final String transportPacketMagicHeader) throws BadConfigException {
+<<<<<<< HEAD
             if (transportPacketMagicHeader == null || transportPacketMagicHeader.trim().isEmpty()) {
                 this.transportPacketMagicHeader = Optional.empty();
             } else {
                 this.transportPacketMagicHeader = Optional.of(transportPacketMagicHeader.trim());
+=======
+            try {
+                long h4 = Long.parseLong(transportPacketMagicHeader);
+                if (h4 <= 0 || h4 > 4294967295L) {
+                    throw new BadConfigException(Section.INTERFACE, Location.TRANSPORT_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, transportPacketMagicHeader);
+                }
+                return setTransportPacketMagicHeader(h4);
+            } catch (final NumberFormatException e) {
+                throw new BadConfigException(Section.INTERFACE, Location.TRANSPORT_PACKET_MAGIC_HEADER, transportPacketMagicHeader, e);
+>>>>>>> e2fbc75 (fix: parser issues go libs)
             }
             return this;
         }
@@ -1126,6 +1165,7 @@ public final class Interface {
             return this;
         }
 
+<<<<<<< HEAD
         public Builder setCookieReplyPacketJunkSize(final int cookieReplyPacketJunkSize) throws BadConfigException {
             if (cookieReplyPacketJunkSize < 0)
                 throw new BadConfigException(Section.INTERFACE, Location.COOKIE_REPLY_PACKET_JUNK_SIZE,
@@ -1157,6 +1197,37 @@ public final class Interface {
             } else {
                 this.responsePacketMagicHeader = Optional.of(responsePacketMagicHeader.trim());
             }
+=======
+        public Builder setInitPacketMagicHeader(final long initPacketMagicHeader) throws BadConfigException {
+            if (initPacketMagicHeader <= 0 || initPacketMagicHeader > 4294967295L)
+                throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_MAGIC_HEADER,
+                        Reason.INVALID_VALUE, String.valueOf(initPacketMagicHeader));
+            this.initPacketMagicHeader = initPacketMagicHeader == 0 ? Optional.empty() : Optional.of(initPacketMagicHeader);
+            return this;
+        }
+
+        public Builder setResponsePacketMagicHeader(final long responsePacketMagicHeader) throws BadConfigException {
+            if (responsePacketMagicHeader <= 0 || responsePacketMagicHeader > 4294967295L)
+                throw new BadConfigException(Section.INTERFACE, Location.RESPONSE_PACKET_MAGIC_HEADER,
+                        Reason.INVALID_VALUE, String.valueOf(responsePacketMagicHeader));
+            this.responsePacketMagicHeader = responsePacketMagicHeader == 0 ? Optional.empty() : Optional.of(responsePacketMagicHeader);
+            return this;
+        }
+
+        public Builder setUnderloadPacketMagicHeader(final long underloadPacketMagicHeader) throws BadConfigException {
+            if (underloadPacketMagicHeader <= 0 || underloadPacketMagicHeader > 4294967295L)
+                throw new BadConfigException(Section.INTERFACE, Location.UNDERLOAD_PACKET_MAGIC_HEADER,
+                        Reason.INVALID_VALUE, String.valueOf(underloadPacketMagicHeader));
+            this.underloadPacketMagicHeader = underloadPacketMagicHeader == 0 ? Optional.empty() : Optional.of(underloadPacketMagicHeader);
+            return this;
+        }
+
+        public Builder setTransportPacketMagicHeader(final long transportPacketMagicHeader) throws BadConfigException {
+            if (transportPacketMagicHeader <= 0 || transportPacketMagicHeader > 4294967295L)
+                throw new BadConfigException(Section.INTERFACE, Location.TRANSPORT_PACKET_MAGIC_HEADER,
+                        Reason.INVALID_VALUE, String.valueOf(transportPacketMagicHeader));
+            this.transportPacketMagicHeader = transportPacketMagicHeader == 0 ? Optional.empty() : Optional.of(transportPacketMagicHeader);
+>>>>>>> e2fbc75 (fix: parser issues go libs)
             return this;
         }
 
