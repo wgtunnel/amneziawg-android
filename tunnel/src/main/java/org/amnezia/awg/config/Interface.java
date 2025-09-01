@@ -983,7 +983,7 @@ public final class Interface {
         public Builder parseJunkPacketCount(final String junkPacketCount) throws BadConfigException {
             try {
                 int jc = Integer.parseInt(junkPacketCount);
-                if (jc < 0 || jc > 10) {
+                if (jc < 0 || jc > 200) {
                     throw new BadConfigException(Section.INTERFACE, Location.JUNK_PACKET_COUNT, Reason.INVALID_VALUE, junkPacketCount);
                 }
                 return setJunkPacketCount(jc);
@@ -995,7 +995,7 @@ public final class Interface {
         public Builder parseJunkPacketMinSize(final String junkPacketMinSize) throws BadConfigException {
             try {
                 int jmin = Integer.parseInt(junkPacketMinSize);
-                if (jmin < 0 || jmin > 1024) {
+                if (jmin < 0 || jmin > 1280) {
                     throw new BadConfigException(Section.INTERFACE, Location.JUNK_PACKET_MIN_SIZE, Reason.INVALID_VALUE, junkPacketMinSize);
                 }
                 return setJunkPacketMinSize(jmin);
@@ -1007,7 +1007,7 @@ public final class Interface {
         public Builder parseJunkPacketMaxSize(final String junkPacketMaxSize) throws BadConfigException {
             try {
                 int jmax = Integer.parseInt(junkPacketMaxSize);
-                if (jmax < 0 || jmax > 1024) {
+                if (jmax < 0 || jmax > 1280) {
                     throw new BadConfigException(Section.INTERFACE, Location.JUNK_PACKET_MAX_SIZE, Reason.INVALID_VALUE, junkPacketMaxSize);
                 }
                 return setJunkPacketMaxSize(jmax);
@@ -1019,7 +1019,7 @@ public final class Interface {
         public Builder parseInitPacketJunkSize(final String initPacketJunkSize) throws BadConfigException {
             try {
                 int s1 = Integer.parseInt(initPacketJunkSize);
-                if (s1 < 0 || s1 > 64) {
+                if (s1 < 0 || s1 > 1280) {
                     throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_JUNK_SIZE, Reason.INVALID_VALUE, initPacketJunkSize);
                 }
                 return setInitPacketJunkSize(s1);
@@ -1031,7 +1031,7 @@ public final class Interface {
         public Builder parseResponsePacketJunkSize(final String responsePacketJunkSize) throws BadConfigException {
             try {
                 int s2 = Integer.parseInt(responsePacketJunkSize);
-                if (s2 < 0 || s2 > 64) {
+                if (s2 < 0 || s2 > 1280) {
                     throw new BadConfigException(Section.INTERFACE, Location.RESPONSE_PACKET_JUNK_SIZE, Reason.INVALID_VALUE, responsePacketJunkSize);
                 }
                 return setResponsePacketJunkSize(s2);
@@ -1043,7 +1043,7 @@ public final class Interface {
         public Builder parseInitPacketMagicHeader(final String initPacketMagicHeader) throws BadConfigException {
             try {
                 long h1 = Long.parseLong(initPacketMagicHeader);
-                if (h1 < 0) {
+                if (h1 <= 0 || h1 > 4294967295L) {
                     throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, initPacketMagicHeader);
                 }
                 return setInitPacketMagicHeader(h1);
@@ -1055,7 +1055,7 @@ public final class Interface {
         public Builder parseResponsePacketMagicHeader(final String responsePacketMagicHeader) throws BadConfigException {
             try {
                 long h2 = Long.parseLong(responsePacketMagicHeader);
-                if (h2 < 0) {
+                if (h2 <= 0 || h2 > 4294967295L) {
                     throw new BadConfigException(Section.INTERFACE, Location.RESPONSE_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, responsePacketMagicHeader);
                 }
                 return setResponsePacketMagicHeader(h2);
@@ -1067,7 +1067,7 @@ public final class Interface {
         public Builder parseUnderloadPacketMagicHeader(final String underloadPacketMagicHeader) throws BadConfigException {
             try {
                 long h3 = Long.parseLong(underloadPacketMagicHeader);
-                if (h3 < 0) {
+                if (h3 <= 0 || h3 > 4294967295L) {
                     throw new BadConfigException(Section.INTERFACE, Location.UNDERLOAD_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, underloadPacketMagicHeader);
                 }
                 return setUnderloadPacketMagicHeader(h3);
@@ -1079,7 +1079,7 @@ public final class Interface {
         public Builder parseTransportPacketMagicHeader(final String transportPacketMagicHeader) throws BadConfigException {
             try {
                 long h4 = Long.parseLong(transportPacketMagicHeader);
-                if (h4 < 0) {
+                if (h4 <= 0 || h4 > 4294967295L) {
                     throw new BadConfigException(Section.INTERFACE, Location.TRANSPORT_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, transportPacketMagicHeader);
                 }
                 return setTransportPacketMagicHeader(h4);
@@ -1223,7 +1223,7 @@ public final class Interface {
         }
 
         public Builder setInitPacketMagicHeader(final long initPacketMagicHeader) throws BadConfigException {
-            if (initPacketMagicHeader < 0)
+            if (initPacketMagicHeader <= 0 || initPacketMagicHeader > 4294967295L)
                 throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_MAGIC_HEADER,
                         Reason.INVALID_VALUE, String.valueOf(initPacketMagicHeader));
             this.initPacketMagicHeader = initPacketMagicHeader == 0 ? Optional.empty() : Optional.of(initPacketMagicHeader);
@@ -1231,7 +1231,7 @@ public final class Interface {
         }
 
         public Builder setResponsePacketMagicHeader(final long responsePacketMagicHeader) throws BadConfigException {
-            if (responsePacketMagicHeader < 0)
+            if (responsePacketMagicHeader <= 0 || responsePacketMagicHeader > 4294967295L)
                 throw new BadConfigException(Section.INTERFACE, Location.RESPONSE_PACKET_MAGIC_HEADER,
                         Reason.INVALID_VALUE, String.valueOf(responsePacketMagicHeader));
             this.responsePacketMagicHeader = responsePacketMagicHeader == 0 ? Optional.empty() : Optional.of(responsePacketMagicHeader);
@@ -1239,7 +1239,7 @@ public final class Interface {
         }
 
         public Builder setUnderloadPacketMagicHeader(final long underloadPacketMagicHeader) throws BadConfigException {
-            if (underloadPacketMagicHeader < 0)
+            if (underloadPacketMagicHeader <= 0 || underloadPacketMagicHeader > 4294967295L)
                 throw new BadConfigException(Section.INTERFACE, Location.UNDERLOAD_PACKET_MAGIC_HEADER,
                         Reason.INVALID_VALUE, String.valueOf(underloadPacketMagicHeader));
             this.underloadPacketMagicHeader = underloadPacketMagicHeader == 0 ? Optional.empty() : Optional.of(underloadPacketMagicHeader);
@@ -1247,7 +1247,7 @@ public final class Interface {
         }
 
         public Builder setTransportPacketMagicHeader(final long transportPacketMagicHeader) throws BadConfigException {
-            if (transportPacketMagicHeader < 0)
+            if (transportPacketMagicHeader <= 0 || transportPacketMagicHeader > 4294967295L)
                 throw new BadConfigException(Section.INTERFACE, Location.TRANSPORT_PACKET_MAGIC_HEADER,
                         Reason.INVALID_VALUE, String.valueOf(transportPacketMagicHeader));
             this.transportPacketMagicHeader = transportPacketMagicHeader == 0 ? Optional.empty() : Optional.of(transportPacketMagicHeader);
