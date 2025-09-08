@@ -14,5 +14,7 @@ public class GoBackend {
 
     public static native int awgTurnOn(String ifName, int tunFd, String settings, String pkgName);
 
+    public static native int awgUpdateTunnelPeers(int handle, String settings);
+
     public static native String awgVersion();
 }

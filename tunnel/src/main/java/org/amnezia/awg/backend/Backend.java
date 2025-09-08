@@ -8,8 +8,6 @@ package org.amnezia.awg.backend;
 import org.amnezia.awg.config.Config;
 import org.amnezia.awg.util.NonNullForAll;
 
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Objects;
 import java.util.Set;
 
@@ -85,6 +83,18 @@ public interface Backend {
      */
     BackendMode setBackendMode(BackendMode backendMode) throws Exception;
 
+    /**
+     * A convenience method meant to be used while the tunnel for purposes of a DDNS change check.
+     * If backend is ${@link GoBackend} or ${@link ProxyGoBackend} in ${@link BackendMode.KillSwitch} mode, bypasses DoH socket to re-resolve peer endpoints.
+     * This will fail if in proxy mode while using something like AdGuard.
+     * @return True if an update was needed and completed, false if no updated needed.
+     */
+    boolean resolveDDNS(Config config, boolean isIpv4Preferred) throws Exception;
+
+    /**
+     * Update tunnel peer configs via IPC without bringing the tunnel down.
+     */
+    boolean updateActiveTunnelPeers(Config config) throws Exception;
 
     abstract class BackendMode {
 

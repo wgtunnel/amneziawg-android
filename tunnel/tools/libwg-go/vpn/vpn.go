@@ -26,8 +26,8 @@ type TunnelHandle struct {
 	uapi   net.Listener
 }
 
-var(
-	tag string
+var (
+	tag           string
 	tunnelHandles map[int32]TunnelHandle
 )
 
@@ -42,13 +42,13 @@ func awgTurnOn(interfaceName string, tunFd int32, settings string, pkgName strin
 
 	if err != nil {
 		unix.Close(int(tunFd))
-		shared.LogError(tag,"CreateUnmonitoredTUNFromFD: %v", err)
+		shared.LogError(tag, "CreateUnmonitoredTUNFromFD: %v", err)
 		return -1
 	}
 
 	conf, err := wireproxyawg.ParseConfigString(settings)
 	if err != nil {
-		shared.LogError(tag,"Invalid config file", err)
+		shared.LogError(tag, "Invalid config file", err)
 		unix.Close(int(tunFd))
 		if tunnel != nil {
 			tunnel.Close()
@@ -56,11 +56,11 @@ func awgTurnOn(interfaceName string, tunFd int32, settings string, pkgName strin
 		return -1
 	}
 
-	shared.LogDebug(tag,"Creating device with domain blocking enabled: %v", conf.Device.DomainBlockingEnabled)
+	shared.LogDebug(tag, "Creating device with domain blocking enabled: %v", conf.Device.DomainBlockingEnabled)
 
 	tunDevice := device.NewDevice(tunnel, conn.NewStdNetBind(), shared.NewLogger("Tun/"+interfaceName), conf.Device.DomainBlockingEnabled, conf.Device.BlockedDomains)
 
-	ipcRequest, err := wireproxyawg.CreateIPCRequest(conf.Device)
+	ipcRequest, err := wireproxyawg.CreateIPCRequest(conf.Device, false)
 	if err != nil {
 		shared.LogError(tag, "CreateIPCRequest: %v", err)
 		unix.Close(int(tunFd))
@@ -101,7 +101,7 @@ func awgTurnOn(interfaceName string, tunFd int32, settings string, pkgName strin
 
 	err = tunDevice.Up()
 	if err != nil {
-		shared.LogError(tag,"Unable to bring up device: %v", err)
+		shared.LogError(tag, "Unable to bring up device: %v", err)
 		uapiFile.Close()
 		tunDevice.Close()
 		return -1
@@ -120,6 +120,36 @@ func awgTurnOn(interfaceName string, tunFd int32, settings string, pkgName strin
 	tunnelHandles[handle] = TunnelHandle{device: tunDevice, uapi: uapi}
 
 	return handle
+}
+
+//export awgUpdateTunnelPeers
+func awgUpdateTunnelPeers(tunnelHandle int32, settings string) int32 {
+	handle, ok := tunnelHandles[tunnelHandle]
+	if !ok {
+		shared.LogError(tag, "Tunnel is not up")
+		return -1
+	}
+
+	conf, err := wireproxyawg.ParseConfigString(settings)
+	if err != nil {
+		shared.LogError(tag, "Invalid config file", err)
+		return -1
+	}
+
+	ipcRequest, err := wireproxyawg.CreatePeerIPCRequest(conf.Device)
+	if err != nil {
+		shared.LogError(tag, "CreateIPCRequest: %v", err)
+		return -1
+	}
+
+	err = handle.device.IpcSet(ipcRequest.IpcRequest)
+	if err != nil {
+		shared.LogError(tag, "IpcSet: %v", err)
+		return -1
+	}
+
+	shared.LogDebug(tag, "Configuration updated successfully")
+	return 0
 }
 
 //export awgTurnOff

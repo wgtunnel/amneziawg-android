@@ -30,7 +30,7 @@ public final class ProxyGoBackend extends AbstractBackend {
             Log.w(TAG, "Tunnel already up");
             return;
         }
-        resolvePeerEndpoints(config, tunnel);
+        resolvePeerEndpoints(config, tunnel.isIpv4ResolutionPreferred(), true);
 
         Config startConfig = config;
 
@@ -109,4 +109,11 @@ public final class ProxyGoBackend extends AbstractBackend {
         return awgGetProxyConfig(handle);
     }
 
+    @Override
+    public boolean updateActiveTunnelPeers(Config config) throws UnsupportedOperationException {
+        if (currentTunnelHandle == -1) throw new UnsupportedOperationException();
+        int completed = awgUpdateProxyTunnelPeers(currentTunnelHandle, config.toAwgQuickStringResolved(false, false,  currentTunnel.isIpv4ResolutionPreferred()));
+        return completed == 0;
+
+    }
 }

@@ -7,16 +7,12 @@ package org.amnezia.awg.backend;
 
 import android.content.Context;
 import android.content.Intent;
-import android.net.VpnService;
 import android.os.ParcelFileDescriptor;
 import android.util.ArraySet;
 import android.util.Log;
 import androidx.annotation.Nullable;
 import com.getkeepsafe.relinker.ReLinker;
-import org.amnezia.awg.config.Config;
-import org.amnezia.awg.config.DnsSettings;
-import org.amnezia.awg.config.InetEndpoint;
-import org.amnezia.awg.config.Peer;
+import org.amnezia.awg.config.*;
 import org.amnezia.awg.crypto.Key;
 import org.amnezia.awg.crypto.KeyFormatException;
 import org.amnezia.awg.hevtunnel.TProxyService;
@@ -29,13 +25,11 @@ import java.io.IOException;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static org.amnezia.awg.GoBackend.awgTurnOff;
-import static org.amnezia.awg.GoBackend.awgVersion;
+import static org.amnezia.awg.GoBackend.*;
 import static org.amnezia.awg.ProxyGoBackend.awgSetSocketProtector;
 import static org.amnezia.awg.ProxyGoBackend.awgStopProxy;
 
@@ -43,7 +37,7 @@ import static org.amnezia.awg.ProxyGoBackend.awgStopProxy;
 public abstract class AbstractBackend implements Backend {
     private static final String TAG = "AmneziaWG/AbstractBackend";
 
-    private static final int DNS_RESOLUTION_RETRIES = 3;
+    private static final int DNS_RESOLUTION_RETRIES = 5;
     private static final long INITIAL_BACKOFF_MS = 500;
     private static final int MTU = 1280;
 
@@ -58,6 +52,7 @@ public abstract class AbstractBackend implements Backend {
 
     @Nullable protected Config currentConfig;
     @Nullable protected Tunnel currentTunnel;
+
     protected int currentTunnelHandle = -1;
 
     protected final ReentrantLock tunnelLock = new ReentrantLock();
@@ -134,13 +129,25 @@ public abstract class AbstractBackend implements Backend {
         }
     }
 
-    private void handleResolverConfiguration(@Nullable Config config) throws ExecutionException, InterruptedException, TimeoutException {
-        // Set resolver based on mode
-        boolean isKillSwitch = backendMode instanceof BackendMode.KillSwitch;
-        SocketFactory socketFactory = isKillSwitch ? vpnService.get(2, TimeUnit.SECONDS).new ProtectedSocketFactory() : null;
-        // Need to pass settings for useDOH and dohUrl via settings
-        DnsSettings dnsSettings = (config != null && config.getDnsSettings() != null) ? config.getDnsSettings() : new DnsSettings(false, null);
-        InetEndpoint.setResolver(dnsSettings.dohEnabled() || isKillSwitch ? new InetEndpoint.DoHResolver(dnsSettings.dohUrl(), Optional.ofNullable(socketFactory)) : new InetEndpoint.SystemResolver());
+    private void handleResolverConfiguration(@Nullable Config config) {
+        boolean needsBypass = backendMode instanceof BackendMode.KillSwitch || (this instanceof GoBackend && currentTunnelHandle != -1);
+        SocketFactory socketFactory = null;
+        if (needsBypass) {
+            try {
+                socketFactory = vpnService.get(5, TimeUnit.SECONDS).new ProtectedSocketFactory();
+                Log.d(TAG, "ProtectedSocketFactory created successfully");
+            } catch (TimeoutException e) {
+                Log.e(TAG, "VpnService timeout; falling back to non-bypassed resolver to avoid blocks", e);
+                needsBypass = false;
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to create ProtectedSocketFactory", e);
+                needsBypass = false;
+            }
+        }
+        DnsSettings dnsSettings = (config != null && config.getDnsSettings() != null) ? config.getDnsSettings() : new DnsSettings(false, Optional.empty());
+        InetEndpoint.setResolver(dnsSettings.dohEnabled() || needsBypass
+                ? new InetEndpoint.DoHResolver(dnsSettings.dohUrl(), Optional.ofNullable(socketFactory))
+                : new InetEndpoint.SystemResolver());
     }
 
     @Override
@@ -281,10 +288,59 @@ public abstract class AbstractBackend implements Backend {
         return stats;
     }
 
+    @Override
+    public boolean resolveDDNS(Config config, boolean isIpv4Preferred) throws Exception {
+        if(currentTunnelHandle == -1 || currentTunnel == null) throw new BackendException(BackendException.Reason.SERVICE_NOT_RUNNING);
+        handleResolverConfiguration(config);
+        Log.d(TAG, "Re-resolving endpoints");
+        resolvePeerEndpoints(config, isIpv4Preferred, false);
+        Statistics stats = getStatistics(currentTunnel);
+        boolean hasUpdate = false;
+        for (final Peer peer : config.getPeers()) {
+            Optional<InetEndpoint> epOpt = peer.getEndpoint();
+            if (epOpt.isEmpty()) continue;
+            InetEndpoint ep = epOpt.get();
+            Optional<InetEndpoint> resolvedOpt = ep.getResolved(isIpv4Preferred);
+            if (resolvedOpt.isEmpty()) continue;
+            InetEndpoint resolved = resolvedOpt.get();
+
+            String activeEndpoint = null;
+            for (Key key : stats.peers()) {
+                if (key.equals(peer.getPublicKey())) {
+                    activeEndpoint = stats.peer(key).resolvedEndpoint();
+                    break;
+                }
+            }
+            if (activeEndpoint == null) {
+                Log.d(TAG, "No stats match for peer pubkey: " + peer.getPublicKey().toBase64());
+                continue;
+            }
+            String resolvedHost = resolved.getHost();
+            Log.d(TAG, "Running endpoint: " + activeEndpoint + " resolved host: " + resolvedHost);
+
+            if (!activeEndpoint.contains(resolvedHost)) {
+                hasUpdate = true;
+                break;
+            }
+        }
+        if (hasUpdate) {
+            Log.d(TAG, "D-DNS has a new IP, updating the tunnel..");
+
+            boolean result = updateActiveTunnelPeers(config);
+            if (!result) {
+                throw new BackendException(BackendException.Reason.UAPI_UPDATE_FAILED);
+            }
+            return true;
+        }
+        return false;
+    }
+
+
+
     @Nullable
     protected abstract String getTunnelConfig(int handle);
 
-    protected void resolvePeerEndpoints(Config config, Tunnel tunnel) throws BackendException {
+    protected void resolvePeerEndpoints(Config config, boolean isIpv4Preferred, boolean withCache) throws BackendException {
         List<InetEndpoint> failedEndpoints = new ArrayList<>();
         for (int i = 0; i < DNS_RESOLUTION_RETRIES; ++i) {
             failedEndpoints.clear();
@@ -292,7 +348,9 @@ public abstract class AbstractBackend implements Backend {
                 Optional<InetEndpoint> epOpt = peer.getEndpoint();
                 if (epOpt.isEmpty()) continue;
                 InetEndpoint ep = epOpt.get();
-                if (ep.getResolved(tunnel.isIpv4ResolutionPreferred()).isEmpty()) {
+                if(!withCache)
+                    ep.clearCache();
+                if (ep.getResolved(isIpv4Preferred).isEmpty()) {
                     failedEndpoints.add(ep);
                 }
             }
@@ -312,6 +370,9 @@ public abstract class AbstractBackend implements Backend {
             }
         }
     }
+
+    @Override
+    public abstract boolean updateActiveTunnelPeers(Config config) throws Exception;
 
     @NonNullForAll
     public static class VpnService extends android.net.VpnService implements SocketProtector {
@@ -503,17 +564,33 @@ public abstract class AbstractBackend implements Backend {
         }
 
         private class ProtectedSocketFactory extends SocketFactory {
+            private static final int PROTECT_RETRY_ATTEMPTS = 1;
+
             @Override
             public Socket createSocket() throws IOException {
                 Socket socket = new Socket();
-                // Explicitly bind to any local address and random port (0) before connecting.
                 socket.bind(new InetSocketAddress(0));
-                // Protect the socket *before* any connection attempt.
-                if (!protect(socket)) {
-                    Log.w(TAG, "protected socket failed");
-                    socket.close();  // Clean up if protection fails.
-                    throw new IOException("Failed to protect socket before connect");
-                } else Log.d(TAG, "protected socket created");
+
+                boolean protectedSuccessfully = false;
+                for (int attempt = 0; attempt <= PROTECT_RETRY_ATTEMPTS; attempt++) {
+                    if (protect(socket)) {
+                        protectedSuccessfully = true;
+                        Log.d(TAG, "Socket protected successfully (attempt " + (attempt + 1) + ")");
+                        break;
+                    }
+                    Log.w(TAG, "protect failed for socket (attempt " + (attempt + 1) + " of " + (PROTECT_RETRY_ATTEMPTS + 1) + "), will proceed unprotected");
+                    if (attempt < PROTECT_RETRY_ATTEMPTS) {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+                }
+                if (!protectedSuccessfully) {
+                    Log.e(TAG, "All protect attempts failed, proceeding with unprotected socket");
+                }
                 return socket;
             }
 

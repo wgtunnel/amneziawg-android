@@ -14,6 +14,7 @@ extern int awgGetSocketV4(int handle);
 extern int awgGetSocketV6(int handle);
 extern char *awgGetConfig(int handle);
 extern char *awgVersion();
+extern int awgUpdateTunnelPeers(int handle, struct go_string settings);
 
 JNIEXPORT jint JNICALL Java_org_amnezia_awg_GoBackend_awgTurnOn(JNIEnv *env, jclass c, jstring ifname, jint tun_fd, jstring settings, jstring pkgname)
 {
@@ -74,4 +75,16 @@ JNIEXPORT jstring JNICALL Java_org_amnezia_awg_GoBackend_awgVersion(JNIEnv *env,
 	ret = (*env)->NewStringUTF(env, version);
 	free(version);
 	return ret;
+}
+
+JNIEXPORT jint JNICALL Java_org_amnezia_awg_GoBackend_awgUpdateTunnelPeers(JNIEnv *env, jclass c, jint handle, jstring settings)
+{
+    const char *settings_str = (*env)->GetStringUTFChars(env, settings, 0);
+    size_t settings_len = (*env)->GetStringUTFLength(env, settings);
+    int ret = awgUpdateTunnelPeers(handle, (struct go_string){
+        .str = settings_str,
+        .n = settings_len
+    });
+    (*env)->ReleaseStringUTFChars(env, settings, settings_str);
+    return ret;
 }
