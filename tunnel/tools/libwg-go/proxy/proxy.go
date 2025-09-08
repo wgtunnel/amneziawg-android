@@ -21,9 +21,9 @@ import (
 import "C"
 
 var (
-	ctx        context.Context
-	cancelFunc context.CancelFunc
-	tag string
+	ctx                  context.Context
+	cancelFunc           context.CancelFunc
+	tag                  string
 	virtualTunnelHandles map[int32]*wireproxyawg.VirtualTun
 )
 
@@ -32,21 +32,19 @@ func init() {
 	virtualTunnelHandles = make(map[int32]*wireproxyawg.VirtualTun)
 }
 
-
 //export awgStartProxy
 func awgStartProxy(interfaceName string, config string, pkgName string, bypass int32) int32 {
 
-
 	conf, err := wireproxyawg.ParseConfigString(config)
 	if err != nil {
-		shared.LogError(tag,"Invalid config file", err)
+		shared.LogError(tag, "Invalid config file", err)
 		return -1
 	}
 
-	setting, err := wireproxyawg.CreateIPCRequest(conf.Device)
+	setting, err := wireproxyawg.CreateIPCRequest(conf.Device, false)
 
 	if err != nil {
-		shared.LogError(tag,"Create IPC request failed", err)
+		shared.LogError(tag, "Create IPC request failed", err)
 		return -1
 	}
 
@@ -58,7 +56,7 @@ func awgStartProxy(interfaceName string, config string, pkgName string, bypass i
 
 	name, err := tun.Name()
 
-	shared.LogDebug(tag,"Creating device with domain blocking enabled: %v", conf.Device.DomainBlockingEnabled)
+	shared.LogDebug(tag, "Creating device with domain blocking enabled: %v", conf.Device.DomainBlockingEnabled)
 
 	bind := conn.NewStdNetBind()
 	stdBind, ok := bind.(*conn.StdNetBind)
@@ -70,7 +68,7 @@ func awgStartProxy(interfaceName string, config string, pkgName string, bypass i
 		stdBind.SetControl(protectControlFunc)
 	}
 
-	dev := device.NewDevice(tun, stdBind, shared.NewLogger("Tun/" + interfaceName), conf.Device.DomainBlockingEnabled, conf.Device.BlockedDomains)
+	dev := device.NewDevice(tun, stdBind, shared.NewLogger("Tun/"+interfaceName), conf.Device.DomainBlockingEnabled, conf.Device.BlockedDomains)
 
 	err = dev.IpcSet(setting.IpcRequest)
 
@@ -80,7 +78,6 @@ func awgStartProxy(interfaceName string, config string, pkgName string, bypass i
 	}
 
 	dev.DisableSomeRoamingForBrokenMobileSemantics()
-
 
 	uapiFile, err := ipc.UAPIOpen(pkgName, name)
 
@@ -151,6 +148,36 @@ func awgStartProxy(interfaceName string, config string, pkgName string, bypass i
 	return handle
 }
 
+//export awgUpdateProxyTunnelPeers
+func awgUpdateProxyTunnelPeers(tunnelHandle int32, settings string) int32 {
+	handle, ok := virtualTunnelHandles[tunnelHandle]
+	if !ok {
+		shared.LogError(tag, "Tunnel is not up")
+		return -1
+	}
+
+	conf, err := wireproxyawg.ParseConfigString(settings)
+	if err != nil {
+		shared.LogError(tag, "Invalid config file", err)
+		return -1
+	}
+
+	ipcRequest, err := wireproxyawg.CreatePeerIPCRequest(conf.Device)
+	if err != nil {
+		shared.LogError(tag, "CreateIPCRequest: %v", err)
+		return -1
+	}
+
+	err = handle.Dev.IpcSet(ipcRequest.IpcRequest)
+	if err != nil {
+		shared.LogError(tag, "IpcSet: %v", err)
+		return -1
+	}
+
+	shared.LogDebug(tag, "Configuration updated successfully")
+	return 0
+}
+
 //export awgGetProxyConfig
 func awgGetProxyConfig(tunnelHandle int32) *C.char {
 	handle, ok := virtualTunnelHandles[tunnelHandle]
@@ -203,10 +230,10 @@ func awgTurnProxyTunnelOff(virtualTunnelHandle int32) {
 	}
 	delete(virtualTunnelHandles, virtualTunnelHandle)
 
-	shared.LogDebug(tag,"Closing tunnel..")
+	shared.LogDebug(tag, "Closing tunnel..")
 	if virtualTun.Uapi != nil {
 		virtualTun.Uapi.Close()
 	}
 	virtualTun.Dev.Close()
-	shared.LogDebug(tag,"Tunnel closed")
+	shared.LogDebug(tag, "Tunnel closed")
 }

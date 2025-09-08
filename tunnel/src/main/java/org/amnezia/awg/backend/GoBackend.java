@@ -18,9 +18,6 @@ import org.amnezia.awg.config.Peer;
 import org.amnezia.awg.util.NonNullForAll;
 
 import java.net.InetAddress;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
 import static org.amnezia.awg.GoBackend.*;
 
 @NonNullForAll
@@ -44,9 +41,9 @@ public final class GoBackend extends AbstractBackend {
             return;
         }
 
-        resolvePeerEndpoints(config, tunnel);
+        resolvePeerEndpoints(config, tunnel.isIpv4ResolutionPreferred(), true);
 
-        final String goConfig = config.toAwgQuickString(false, false);
+        final String goConfig = config.toAwgQuickStringResolved(false, false, tunnel.isIpv4ResolutionPreferred());
         final VpnService.Builder builder = service.getBuilder();
         builder.setSession(tunnel.getName());
 
@@ -113,6 +110,14 @@ public final class GoBackend extends AbstractBackend {
         tunnelActionHandler.runPreDown(config != null ? config.getInterface().getPreDown() : null);
         awgTurnOff(handleToClose);
         tunnelActionHandler.runPostDown(config != null ? config.getInterface().getPostDown() : null);
+    }
+
+    @Override
+    public boolean updateActiveTunnelPeers(Config config) throws UnsupportedOperationException {
+        if (currentTunnelHandle == -1) throw new UnsupportedOperationException();
+        int completed = awgUpdateTunnelPeers(currentTunnelHandle, config.toAwgQuickStringResolved(false, false, currentTunnel.isIpv4ResolutionPreferred()));
+        return completed == 0;
+
     }
 
     @Override

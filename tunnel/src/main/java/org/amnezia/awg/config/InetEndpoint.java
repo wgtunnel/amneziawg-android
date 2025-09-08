@@ -13,8 +13,12 @@ import org.amnezia.awg.util.NonNullForAll;
 import java.net.*;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import androidx.annotation.Nullable;
 
@@ -40,7 +44,8 @@ public final class InetEndpoint {
     private static final long NEGATIVE_TTL_SECONDS = 30;
 
     private static boolean useDoH = false; // User setting, default false
-    private static String preferredDoHUrl = "https://1.1.1.1/dns-query";
+    public static final String DEFAULT_DOH_URL = "https://1.1.1.1/dns-query";
+    private static String preferredDoHUrl = DEFAULT_DOH_URL;
 
     private static Resolver currentResolver = new SystemResolver();
 
@@ -60,9 +65,13 @@ public final class InetEndpoint {
     private final boolean isResolved;
     private final Object lock = new Object();
     private final int port;
-    private Instant lastResolution = Instant.MIN;
     private Instant lastFailedResolution = Instant.MIN;
-    @Nullable private InetEndpoint resolved;
+
+    // Dual caches for IPv4 and IPv6
+    @Nullable private InetEndpoint resolvedIpv4;
+    @Nullable private InetEndpoint resolvedIpv6;
+    private Instant lastResolutionIpv4 = Instant.MIN;
+    private Instant lastResolutionIpv6 = Instant.MIN;
 
     private InetEndpoint(final String host, final boolean isResolved, final int port) {
         this.host = host;
@@ -114,45 +123,84 @@ public final class InetEndpoint {
      * @return the resolved endpoint, or {@link Optional#empty()}
      */
     public Optional<InetEndpoint> getResolved(Boolean preferIpv4) {
-        Log.d(TAG, "Resolving with ipv4 preferred: " + preferIpv4 + "and resolver: " + currentResolver.getClass().getSimpleName());
+        Log.d(TAG, "Resolving with ipv4 preferred: " + preferIpv4 + " and resolver: " + currentResolver.getClass().getSimpleName());
         if (isResolved) return Optional.of(this);
-        if (Duration.between(lastResolution, Instant.now()).getSeconds() <= DEFAULT_TTL_SECONDS) {
-            synchronized (lock) {
-                return Optional.ofNullable(resolved);
-            }
-        }
-        if (Duration.between(lastFailedResolution, Instant.now()).getSeconds() <= NEGATIVE_TTL_SECONDS) {
-            return Optional.empty();
-        }
+        Instant now = Instant.now();
         synchronized (lock) {
-            if (Duration.between(lastResolution, Instant.now()).getSeconds() <= DEFAULT_TTL_SECONDS) {
-                return Optional.ofNullable(resolved);
+            Instant lastRes = preferIpv4 ? lastResolutionIpv4 : lastResolutionIpv6;
+            InetEndpoint cached = preferIpv4 ? resolvedIpv4 : resolvedIpv6;
+            if (Duration.between(lastRes, now).getSeconds() <= DEFAULT_TTL_SECONDS && cached != null) {
+                return Optional.of(cached);
             }
+
+            if (Duration.between(lastFailedResolution, now).getSeconds() <= NEGATIVE_TTL_SECONDS) {
+                return Optional.empty();
+            }
+
             try {
                 final InetAddress[] candidates = currentResolver.resolve(host);
                 if (candidates == null || candidates.length == 0) {
                     Log.w(TAG, "No addresses resolved for host: " + host);
-                    lastFailedResolution = Instant.now();
-                    resolved = null;
+                    lastFailedResolution = now;
                     return Optional.empty();
                 }
-                InetAddress address = candidates[0];
-                if (preferIpv4) {
-                    for (final InetAddress candidate : candidates) {
-                        if (candidate instanceof Inet4Address) {
-                            address = candidate;
-                            break;
-                        }
-                    }
+
+                int ipv4Count = 0;
+                String first = "none";
+                for (InetAddress addr : candidates) {
+                    if (addr instanceof Inet4Address) ipv4Count++;
+                    if (first.equals("none")) first = addr.getHostAddress();
                 }
-                resolved = new InetEndpoint(address.getHostAddress(), true, port);
-                lastResolution = Instant.now();
+
+                // Separate caches
+                InetEndpoint ipv4Ep = null;
+                InetEndpoint ipv6Ep = null;
+                for (InetAddress addr : candidates) {
+                    String addrStr = addr.getHostAddress();
+                    if (addr instanceof Inet4Address && ipv4Ep == null) {
+                        ipv4Ep = new InetEndpoint(addrStr, true, port);
+                    } else if (ipv6Ep == null) {  // Assume non-v4 is v6
+                        ipv6Ep = new InetEndpoint(addrStr, true, port);
+                    }
+                    if (ipv4Ep != null && ipv6Ep != null) break;
+                }
+                // Fallback: If no IPv4 but want it, use first non-v6 or error
+                if (preferIpv4 && ipv4Ep == null) {
+                    ipv4Ep = new InetEndpoint(candidates[0].getHostAddress(), true, port);
+                }
+
+                // Cache based on family
+                if (ipv4Ep != null) {
+                    resolvedIpv4 = ipv4Ep;
+                    lastResolutionIpv4 = now;
+                }
+                if (ipv6Ep != null) {
+                    resolvedIpv6 = ipv6Ep;
+                    lastResolutionIpv6 = now;
+                }
+                // Return preferred
+                InetEndpoint toReturn = preferIpv4 ? ipv4Ep : ipv6Ep;
+                return Optional.ofNullable(toReturn);
             } catch (final UnknownHostException e) {
                 Log.w(TAG, "Failed to resolve host " + host + ": " + e.getMessage());
-                lastFailedResolution = Instant.now();
-                resolved = null;
+                lastFailedResolution = now;
+                return Optional.empty();
             }
-            return Optional.ofNullable(resolved);
+        }
+    }
+
+    /**
+     * Clears the cached DNS resolution and resets resolution timestamps.
+     * This forces the next call to getResolved to perform a fresh DNS query.
+     */
+    public void clearCache() {
+        synchronized (lock) {
+            resolvedIpv4 = null;
+            resolvedIpv6 = null;
+            lastResolutionIpv4 = Instant.MIN;
+            lastResolutionIpv6 = Instant.MIN;
+            lastFailedResolution = Instant.MIN;
+            Log.d(TAG, "Cleared DNS cache for host: " + host);
         }
     }
 
@@ -167,7 +215,7 @@ public final class InetEndpoint {
         return (isBareIpv6 ? '[' + host + ']' : host) + ':' + port;
     }
 
-    interface Resolver {
+    public interface Resolver {
         InetAddress[] resolve(String host) throws UnknownHostException;
     }
 
@@ -180,7 +228,7 @@ public final class InetEndpoint {
 
     public record DoHResolver(Optional<String> dohUrl, Optional<SocketFactory> socketFactory) implements Resolver {
         @Override
-            public InetAddress[] resolve(String host) throws UnknownHostException {
+        public InetAddress[] resolve(String host) throws UnknownHostException {
             Log.i(TAG, "Using DoH URL: " + dohUrl.orElse(preferredDoHUrl));
             Log.i(TAG, "SocketFactory in use: " + (socketFactory.map(factory -> factory.getClass().getSimpleName()).orElse("none")));
 
@@ -189,15 +237,15 @@ public final class InetEndpoint {
             OkHttpClient client = builder
                     .build();
             String url = dohUrl.orElse(preferredDoHUrl);
-                DnsOverHttps doh = new DnsOverHttps.Builder()
-                        .client(client)
-                        .url(HttpUrl.parse(url)).build();
-                try {
-                    List<InetAddress> addresses = doh.lookup(host);
-                    return addresses.toArray(new InetAddress[0]);
-                } catch (IOException e) {
-                    throw new UnknownHostException(e.getMessage());
-                }
+            DnsOverHttps doh = new DnsOverHttps.Builder()
+                    .client(client)
+                    .url(HttpUrl.parse(url)).build();
+            try {
+                List<InetAddress> addresses = doh.lookup(host);
+                return addresses.toArray(new InetAddress[0]);
+            } catch (IOException e) {
+                throw new UnknownHostException(e.getMessage());
             }
         }
+    }
 }
