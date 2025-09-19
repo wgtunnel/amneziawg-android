@@ -195,14 +195,20 @@ func awgGetProxyConfig(tunnelHandle int32) *C.char {
 
 //export awgStopProxy
 func awgStopProxy() {
-	// Signal routines to stop
 	if cancelFunc != nil {
 		shared.LogDebug(tag, "Stopping proxy routines..")
 		cancelFunc()
+		cancelFunc = nil
 	}
-	for handle, _ := range virtualTunnelHandles {
+	handles := make([]int32, 0, len(virtualTunnelHandles))
+	for h := range virtualTunnelHandles {
+		handles = append(handles, h)
+	}
+	for _, handle := range handles {
 		awgTurnProxyTunnelOff(handle)
 	}
+	virtualTunnelHandles = make(map[int32]*wireproxyawg.VirtualTun)
+	shared.LogDebug(tag, "Proxy fully reset: %d handles closed", len(handles))
 }
 
 // control hook to bypass sockets
@@ -225,15 +231,20 @@ func protectControlFunc(network, address string, c syscall.RawConn) error {
 func awgTurnProxyTunnelOff(virtualTunnelHandle int32) {
 	virtualTun, ok := virtualTunnelHandles[virtualTunnelHandle]
 	if !ok {
-		shared.LogError(tag, "Tunnel is not up")
+		shared.LogError(tag, "Tunnel handle %d not found", virtualTunnelHandle)
 		return
 	}
-	delete(virtualTunnelHandles, virtualTunnelHandle)
+	shared.LogDebug(tag, "Tearing down tunnel %d", virtualTunnelHandle)
 
-	shared.LogDebug(tag, "Closing tunnel..")
+	// Close UAPI listener and underlying file
 	if virtualTun.Uapi != nil {
 		virtualTun.Uapi.Close()
 	}
-	virtualTun.Dev.Close()
-	shared.LogDebug(tag, "Tunnel closed")
+
+	if virtualTun.Dev != nil {
+		virtualTun.Dev.Close()
+	}
+
+	delete(virtualTunnelHandles, virtualTunnelHandle)
+	shared.LogDebug(tag, "Tunnel %d fully closed (UAPI/Dev/Bind purged)", virtualTunnelHandle)
 }

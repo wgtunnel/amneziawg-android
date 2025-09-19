@@ -14,4 +14,6 @@ public class ProxyGoBackend {
     public static native String awgGetProxyConfig(int handle);
 
     public static native void awgSetSocketProtector(SocketProtector sp);
+
+    public static native void awgResetJNIGlobals();
 }

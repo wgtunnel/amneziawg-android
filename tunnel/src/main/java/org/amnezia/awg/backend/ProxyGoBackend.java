@@ -36,24 +36,30 @@ public final class ProxyGoBackend extends AbstractBackend {
 
         // overwrite proxy settings for lockdown mode
         boolean isKillSwitch = backendMode instanceof BackendMode.KillSwitch;
-        if(isKillSwitch) startConfig = new Config.Builder()
+        if (isKillSwitch) startConfig = new Config.Builder()
                 .setDnsSettings(config.getDnsSettings())
-                        .setInterface(config.getInterface())
-                                .addPeers(config.getPeers())
-                                        .addProxies(List.of(new Socks5Proxy(
-                                                String.format("%s:%d", LOCALHOST, PORT),
-                                                USERNAME,
-                                                PASSWORD
-                                        ))).build();
+                .setInterface(config.getInterface())
+                .addPeers(config.getPeers())
+                .addProxies(List.of(new Socks5Proxy(
+                        String.format("%s:%d", LOCALHOST, PORT),
+                        USERNAME,
+                        PASSWORD
+                ))).build();
 
-
+        if (isKillSwitch) {
+            if (VpnService.prepare(context) != null) {
+                throw new BackendException(BackendException.Reason.VPN_NOT_AUTHORIZED);
+            }
+            startVpnService(this);  // fetch and sets owner/protector
+            Log.d(TAG, "Proxy tunnel: Refreshed VpnService and protector for kill switch");
+        }
 
         final String quickConfig = startConfig.toAwgQuickStringResolved(false, true, tunnel.isIpv4ResolutionPreferred());
         tunnelActionHandler.runPreUp(config.getInterface().getPreUp());
         String packageName = context.getPackageName();
         // simple flag to tell proxy backend to bypass netstack sockets or not
         int bypass = isKillSwitch ? 1 : 0;
-        currentTunnelHandle = awgStartProxy(tunnel.getName() ,quickConfig, packageName, bypass);
+        currentTunnelHandle = awgStartProxy(tunnel.getName(), quickConfig, packageName, bypass);
         tunnelActionHandler.runPostUp(config.getInterface().getPostUp());
         if (currentTunnelHandle < 0) {
             throw new BackendException(BackendException.Reason.GO_ACTIVATION_ERROR_CODE, currentTunnelHandle);
@@ -67,6 +73,7 @@ public final class ProxyGoBackend extends AbstractBackend {
             return;
         }
         tunnelActionHandler.runPreDown(config != null ? config.getInterface().getPreDown() : null);
+        awgResetJNIGlobals();
         awgStopProxy();
         currentTunnelHandle = -1;
         tunnelActionHandler.runPostDown(config != null ? config.getInterface().getPostDown() : null);
@@ -93,6 +100,11 @@ public final class ProxyGoBackend extends AbstractBackend {
 
         Log.d(TAG, "Getting the service");
         VpnService service = startVpnService(this);
+
+        if (backendMode instanceof BackendMode.KillSwitch) {
+            service.setOwner(this);
+        }
+
         if(disableLockdown) {
             Log.d(TAG, "Shutting it down");
             service.shutdown();
