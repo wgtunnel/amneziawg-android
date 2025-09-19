@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <android/log.h>
+#include <unistd.h>
 
 #define LOG_TAG "AmneziaWG/BypassSocket"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 struct go_string { const char *str; long n; };
@@ -16,6 +17,24 @@ extern int awgUpdateProxyTunnelPeers(int handle, struct go_string settings);
 static JavaVM *g_jvm = NULL;
 static jobject g_protector = NULL;
 static jmethodID g_protectMethod = NULL;
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+    g_jvm = vm;
+    LOGD("JNI_OnLoad: Cached g_jvm=%p", g_jvm);
+    return JNI_VERSION_1_6;
+}
+
+JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
+    if (g_protector != NULL) {
+        JNIEnv *env;
+        (*vm)->GetEnv(vm, (void**)&env, JNI_VERSION_1_6);
+        (*env)->DeleteGlobalRef(env, g_protector);
+        g_protector = NULL;
+        g_protectMethod = NULL;
+    }
+    g_jvm = NULL;
+    LOGD("JNI_OnUnload: Cleared globals");
+}
 
 JNIEXPORT jint JNICALL Java_org_amnezia_awg_ProxyGoBackend_awgStartProxy(JNIEnv *env, jclass c, jstring ifname, jstring settings, jstring pkgname, jint bypass)
 {
@@ -57,15 +76,37 @@ JNIEXPORT jstring JNICALL Java_org_amnezia_awg_ProxyGoBackend_awgGetProxyConfig(
     return ret;
 }
 
-JNIEXPORT void JNICALL Java_org_amnezia_awg_ProxyGoBackend_awgSetSocketProtector(JNIEnv *env, jclass c, jobject protector)
-{
+JNIEXPORT void JNICALL Java_org_amnezia_awg_ProxyGoBackend_awgSetSocketProtector(JNIEnv *env, jclass c, jobject protector) {
     (*env)->GetJavaVM(env, &g_jvm);
+    if (g_jvm == NULL) {
+        LOGE("awgSetSocketProtector: g_jvm still NULL post-GetJavaVM");
+        return;
+    }
     if (g_protector != NULL) {
         (*env)->DeleteGlobalRef(env, g_protector);
     }
     g_protector = (*env)->NewGlobalRef(env, protector);
     jclass protectorClass = (*env)->GetObjectClass(env, protector);
+    if (protectorClass == NULL) {
+        LOGE("Failed to get protectorClass");
+        return;
+    }
     g_protectMethod = (*env)->GetMethodID(env, protectorClass, "bypass", "(I)I");
+    if (g_protectMethod == NULL) {
+        LOGE("Failed to get bypass method ID");
+    }
+    LOGD("awgSetSocketProtector: Refreshed g_protector=%p, method=%p", g_protector, g_protectMethod);
+}
+
+JNIEXPORT void JNICALL Java_org_amnezia_awg_ProxyGoBackend_awgResetJNIGlobals(JNIEnv *env, jclass c) {
+    if (g_jvm != NULL && g_protector != NULL) {
+        JNIEnv *tmp_env;
+        (*g_jvm)->GetEnv(g_jvm, (void**)&tmp_env, JNI_VERSION_1_6);
+        (*tmp_env)->DeleteGlobalRef(tmp_env, g_protector);
+    }
+    g_protector = NULL;
+    g_protectMethod = NULL;
+    LOGD("awgResetJNIGlobals: Cleared protector and method");
 }
 
 int bypass_socket(int fd) {
@@ -78,7 +119,7 @@ int bypass_socket(int fd) {
     jboolean attached = JNI_FALSE;
     jint rs = -1;
 
-    LOGI("bypass_socket called with FD: %d", fd);
+    LOGD("bypass_socket called with FD: %d", fd);
 
     if (g_jvm == NULL) {
         LOGE("g_jvm is NULL - not initialized in JNI_OnLoad?");
@@ -86,21 +127,25 @@ int bypass_socket(int fd) {
     }
 
     rs = (*g_jvm)->GetEnv(g_jvm, (void **)&env, JNI_VERSION_1_6);
-    LOGI("GetEnv returned: %d (env=%p)", rs, env);
+    LOGD("GetEnv returned: %d (env=%p)", rs, env);
 
     if (rs == JNI_EDETACHED) {
-        LOGI("Thread detached, attempting AttachCurrentThread");
-        if ((*g_jvm)->AttachCurrentThread(g_jvm, &env, NULL) != JNI_OK) {
-            LOGE("AttachCurrentThread failed");
+        LOGD("Thread detached, attempting AttachCurrentThread");
+        int retries = 3;
+        while (retries-- > 0 && (*g_jvm)->AttachCurrentThread(g_jvm, &env, NULL) != JNI_OK) {
+            usleep(10000); // 10ms backoff
+        }
+        if (retries < 0) {
+            LOGE("AttachCurrentThread failed after retries");
             return 0;
         }
         attached = JNI_TRUE;
-        LOGI("Attached successfully, env=%p", env);
+        LOGD("Attached successfully, env=%p", env);
     } else if (rs != JNI_OK) {
         LOGE("GetEnv failed with %d (not OK or detached)", rs);
         return 0;
     } else {
-        LOGI("Thread already attached, env=%p", env);
+        LOGD("Thread already attached, env=%p", env);
     }
 
     if (env == NULL) {
@@ -118,7 +163,7 @@ int bypass_socket(int fd) {
         }
         return 0;
     }
-    LOGI("g_protector ref valid: %p", g_protector);
+    LOGD("g_protector ref valid: %p", g_protector);
 
     if (g_protectMethod == NULL) {
         LOGE("g_protectMethod is NULL - method ID not cached?");
@@ -127,7 +172,7 @@ int bypass_socket(int fd) {
         }
         return 0;
     }
-    LOGI("g_protectMethod valid");
+    LOGD("g_protectMethod valid");
 
     // Clear any pending exceptions before call
     if ((*env)->ExceptionCheck(env)) {
@@ -136,7 +181,7 @@ int bypass_socket(int fd) {
     }
 
     int result = (*env)->CallIntMethod(env, g_protector, g_protectMethod, fd);
-    LOGI("CallIntMethod returned: %d", result);
+    LOGD("CallIntMethod returned: %d", result);
 
     // Check for exceptions after call
     if ((*env)->ExceptionCheck(env)) {
@@ -148,10 +193,10 @@ int bypass_socket(int fd) {
 
     if (attached) {
         (*g_jvm)->DetachCurrentThread(g_jvm);
-        LOGI("Detached thread");
+        LOGD("Detached thread");
     }
 
-    LOGI("bypass_socket returning: %d for FD %d", result, fd);
+    LOGD("bypass_socket returning: %d for FD %d", result, fd);
     return result;
 }
 

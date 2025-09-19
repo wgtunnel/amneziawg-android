@@ -30,8 +30,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static org.amnezia.awg.GoBackend.*;
-import static org.amnezia.awg.ProxyGoBackend.awgSetSocketProtector;
-import static org.amnezia.awg.ProxyGoBackend.awgStopProxy;
+import static org.amnezia.awg.ProxyGoBackend.*;
 
 @NonNullForAll
 public abstract class AbstractBackend implements Backend {
@@ -188,7 +187,8 @@ public abstract class AbstractBackend implements Backend {
         if (!vpnService.isDone()) {
             Log.d(TAG, "Requesting to start VpnService");
             context.startService(new Intent(context, VpnService.class));
-        } else return vpnService.get(2, TimeUnit.SECONDS);
+        }
+        // Always fetch and set owner—no early return
         VpnService service;
         try {
             service = vpnService.get(2, TimeUnit.SECONDS);
@@ -198,6 +198,7 @@ public abstract class AbstractBackend implements Backend {
             throw be;
         }
         service.setOwner(owner);
+        Log.d(TAG, "startVpnService: Service obtained and owner set for " + owner.getClass().getSimpleName());
         return service;
     }
 
@@ -405,8 +406,17 @@ public abstract class AbstractBackend implements Backend {
             try {
                 stopKillSwitch();
             } catch (Exception e) {
-                Log.w(TAG, e);
+                Log.w(TAG, "Kill switch shutdown error", e);
             }
+            if (owner instanceof ProxyGoBackend) {
+                awgResetJNIGlobals();
+            }
+            owner = null;
+            if (!vpnService.isDone()) {
+                vpnService.cancel(false);
+            }
+            vpnService = new CompletableFuture<>();
+            Log.d(TAG, "VpnService hard reset (future canceled, owner cleared)");
         }
 
         private void handleDestroy(final AbstractBackend owner) {
@@ -437,11 +447,17 @@ public abstract class AbstractBackend implements Backend {
         }
 
         public void setOwner(final AbstractBackend owner) {
+            Log.d(TAG, "setOwner called with owner: " + owner.getClass().getSimpleName());
             this.owner = owner;
             try {
-                if(owner instanceof ProxyGoBackend) awgSetSocketProtector(this);
+                if (owner instanceof ProxyGoBackend) {
+                    Log.d(TAG, "Calling awgSetSocketProtector for ProxyGoBackend");
+                    awgSetSocketProtector(this);
+                } else {
+                    Log.d(TAG, "Skipping awgSetSocketProtector (not ProxyGoBackend)");
+                }
             } catch (final Exception e) {
-                Log.w(TAG, e);
+                Log.e(TAG, "Exception in setOwner", e);  // NEW: Promote to ERROR for visibility
             }
         }
 
