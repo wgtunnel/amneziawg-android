@@ -26,6 +26,12 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install coreutils for sha256sum
+        run: brew install coreutils
+
+      - name: Add coreutils to PATH (for sha256sum without 'g' prefix)
+        run: echo "/opt/homebrew/opt/coreutils/libexec/gnubin" >> $GITHUB_PATH
+
       - name: Install Flock
         run: brew install flock
 
@@ -58,7 +64,7 @@ jobs:
         run: ./gradlew clean
 
       - name: Publish to Maven Central
-        run: ./gradlew publishAggregationToCentralPortal
+        run: ./gradlew publishAggregationToCentralPortal --no-daemon
 
       - name: Extract version from tag
         id: vars
