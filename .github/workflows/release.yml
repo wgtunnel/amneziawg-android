@@ -74,7 +74,8 @@ jobs:
         run: |
           VERSION=${{ steps.vars.outputs.version }}
           VERSION=${VERSION#v}
-          sed -i "s/implementation(\"com.zaneschepke:amneziawg-android:[^\"]*\")/implementation(\"com.zaneschepke:amneziawg-android:$VERSION\")/" README.md
+          sed -i '' "s/implementation(\"com.zaneschepke:amneziawg-android:[^\"]*\")/implementation(\"com.zaneschepke:amneziawg-android:$VERSION\")/" README.md
+        shell: bash
 
       # Create GitHub Release
       - name: Create GitHub Release
