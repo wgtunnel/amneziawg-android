@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.kapt) apply false
-    alias(libs.plugins.nmcp)
+    alias(libs.plugins.nmcp.aggregation)
 }
 
 nmcpAggregation {
@@ -16,6 +16,5 @@ nmcpAggregation {
         publishingType = "AUTOMATIC"
     }
 
-    // Publish all projects that apply the 'maven-publish' plugin
     publishAllProjectsProbablyBreakingProjectIsolation()
 }
