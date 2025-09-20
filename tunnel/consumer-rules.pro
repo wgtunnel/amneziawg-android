@@ -3,4 +3,3 @@
 
 -keep class okhttp3.internal.publicsuffix.PublicSuffixDatabase { *; }
 -keepnames class okhttp3.internal.publicsuffix.PublicSuffixDatabase
--adaptresourcefilenames okhttp3/internal/publicsuffix/publicsuffixes.gz
