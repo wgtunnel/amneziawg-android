@@ -68,12 +68,6 @@ android {
             withSourcesJar()
         }
     }
-    packaging {
-        resources {
-            // Ensure the publicsuffixes.gz file is kept during packaging
-            pickFirsts.add("okhttp3/internal/publicsuffix/publicsuffixes.gz")
-        }
-    }
 }
 
 dependencies {
