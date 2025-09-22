@@ -658,6 +658,38 @@ public final class Interface {
     }
 
     /**
+     * Converts the {@code Interface} into a string suitable for inclusion in a standard {@code wg-quick}
+     * configuration file, ignoring Amnezia-specific properties.
+     *
+     * @return The {@code Interface} represented as a series of "Key = Value" lines
+     */
+    public String toWgQuickString(final Boolean includeScripts) {
+        final StringBuilder sb = new StringBuilder();
+        if (!addresses.isEmpty())
+            sb.append("Address = ").append(Attribute.join(addresses)).append('\n');
+        if (!dnsServers.isEmpty() || !dnsSearchDomains.isEmpty()) {
+            final List<String> dnsList = new ArrayList<>();
+            dnsList.addAll(dnsServers.stream().map(InetAddress::getHostAddress).collect(Collectors.toList()));
+            dnsList.addAll(dnsSearchDomains);
+            sb.append("DNS = ").append(Attribute.join(dnsList)).append('\n');
+        }
+        listenPort.ifPresent(lp -> sb.append("ListenPort = ").append(lp).append('\n'));
+        mtu.ifPresent(m -> sb.append("MTU = ").append(m).append('\n'));
+        sb.append("PrivateKey = ").append(keyPair.getPrivateKey().toBase64()).append('\n');
+        if (includeScripts) {
+            for (final String script : preUp)
+                sb.append("PreUp = ").append(script).append('\n');
+            for (final String script : postUp)
+                sb.append("PostUp = ").append(script).append('\n');
+            for (final String script : preDown)
+                sb.append("PreDown = ").append(script).append('\n');
+            for (final String script : postDown)
+                sb.append("PostDown = ").append(script).append('\n');
+        }
+        return sb.toString();
+    }
+
+    /**
      * Serializes the {@code Interface} for use with the AmneziaWG cross-platform userspace API.
      * Note that not all attributes are included in this representation.
      *
