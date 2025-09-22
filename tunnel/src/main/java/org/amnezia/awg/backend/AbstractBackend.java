@@ -12,6 +12,7 @@ import android.util.ArraySet;
 import android.util.Log;
 import androidx.annotation.Nullable;
 import com.getkeepsafe.relinker.ReLinker;
+import okhttp3.internal.platform.PlatformRegistry;
 import org.amnezia.awg.config.*;
 import org.amnezia.awg.crypto.Key;
 import org.amnezia.awg.crypto.KeyFormatException;
@@ -67,6 +68,8 @@ public abstract class AbstractBackend implements Backend {
 
     protected AbstractBackend(final Context context, final TunnelActionHandler tunnelActionHandler) {
         ReLinker.loadLibrary(context, "am-go");
+        // fix for okhttp https://github.com/square/okhttp/issues/9024
+        PlatformRegistry.INSTANCE.setApplicationContext(context);
         this.context = context;
         this.tunnelActionHandler = tunnelActionHandler;
     }
