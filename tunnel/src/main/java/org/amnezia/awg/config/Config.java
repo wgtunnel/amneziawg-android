@@ -5,6 +5,7 @@
 
 package org.amnezia.awg.config;
 
+import android.content.Context;
 import androidx.annotation.Nullable;
 
 import org.amnezia.awg.config.BadConfigException.Location;
@@ -216,11 +217,11 @@ public final class Config {
      * @return the {@code Config} represented as one [Interface], zero or more [Peer], and zero or
      * more [Socks5] or [Http] sections
      */
-    public String toAwgQuickStringResolved(final Boolean includeScripts, final Boolean includeProxies, final Boolean preferIpv4) {
+    public String toAwgQuickStringResolved(final Boolean includeScripts, final Boolean includeProxies, final Boolean preferIpv4, Context context) {
         final StringBuilder sb = new StringBuilder();
         sb.append("[Interface]\n").append(interfaze.toAwgQuickString(includeScripts));
         for (final Peer peer : peers) {
-            sb.append("\n[Peer]\n").append( peer.toAwgQuickStringResolved(preferIpv4));
+            sb.append("\n[Peer]\n").append(peer.toAwgQuickStringResolved(preferIpv4, context));
         }
         if (includeProxies) {
             for (final Proxy proxy : proxies)
@@ -235,12 +236,12 @@ public final class Config {
      *
      * @return the {@code Config} represented as a series of "key=value" lines
      */
-    public String toAwgUserspaceString(Boolean preferIpv4) {
+    public String toAwgUserspaceString(Boolean preferIpv4, Context context) {
         final StringBuilder sb = new StringBuilder();
         sb.append(interfaze.toAwgUserspaceString());
         sb.append("replace_peers=true\n");
         for (final Peer peer : peers)
-            sb.append(peer.toAwgUserspaceString(preferIpv4));
+            sb.append(peer.toAwgUserspaceString(preferIpv4, context));
         return sb.toString();
     }
 

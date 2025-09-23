@@ -304,7 +304,7 @@ public abstract class AbstractBackend implements Backend {
             Optional<InetEndpoint> epOpt = peer.getEndpoint();
             if (epOpt.isEmpty()) continue;
             InetEndpoint ep = epOpt.get();
-            Optional<InetEndpoint> resolvedOpt = ep.getResolved(isIpv4Preferred);
+            Optional<InetEndpoint> resolvedOpt = ep.getResolved(isIpv4Preferred, context);
             if (resolvedOpt.isEmpty()) continue;
             InetEndpoint resolved = resolvedOpt.get();
 
@@ -354,7 +354,7 @@ public abstract class AbstractBackend implements Backend {
                 InetEndpoint ep = epOpt.get();
                 if(!withCache)
                     ep.clearCache();
-                if (ep.getResolved(isIpv4Preferred).isEmpty()) {
+                if (ep.getResolved(isIpv4Preferred, context).isEmpty()) {
                     failedEndpoints.add(ep);
                 }
             }

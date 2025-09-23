@@ -5,6 +5,7 @@
 
 package org.amnezia.awg.config;
 
+import android.content.Context;
 import org.amnezia.awg.config.BadConfigException.Location;
 import org.amnezia.awg.config.BadConfigException.Reason;
 import org.amnezia.awg.config.BadConfigException.Section;
@@ -184,11 +185,11 @@ public final class Peer {
      *
      * @return the {@code Peer} represented as a series of "Key = Value" lines
      */
-    public String toAwgQuickStringResolved(Boolean preferIpv4) {
+    public String toAwgQuickStringResolved(Boolean preferIpv4, Context context) {
         final StringBuilder sb = new StringBuilder();
         if (!allowedIps.isEmpty())
             sb.append("AllowedIPs = ").append(Attribute.join(allowedIps)).append('\n');
-        endpoint.flatMap(ep -> ep.getResolved(preferIpv4)).ifPresent(ep -> sb.append("Endpoint =").append(ep).append('\n'));
+        endpoint.flatMap(ep -> ep.getResolved(preferIpv4, context)).ifPresent(ep -> sb.append("Endpoint =").append(ep).append('\n'));
         persistentKeepalive.ifPresent(pk -> sb.append("PersistentKeepalive = ").append(pk).append('\n'));
         preSharedKey.ifPresent(psk -> sb.append("PreSharedKey = ").append(psk.toBase64()).append('\n'));
         sb.append("PublicKey = ").append(publicKey.toBase64()).append('\n');
@@ -201,13 +202,13 @@ public final class Peer {
      *
      * @return the {@code Peer} represented as a series of "key=value" lines
      */
-    public String toAwgUserspaceString(Boolean preferIpv4) {
+    public String toAwgUserspaceString(Boolean preferIpv4, Context context) {
         final StringBuilder sb = new StringBuilder();
         // The order here is important: public_key signifies the beginning of a new peer.
         sb.append("public_key=").append(publicKey.toHex()).append('\n');
         for (final InetNetwork allowedIp : allowedIps)
             sb.append("allowed_ip=").append(allowedIp).append('\n');
-        endpoint.flatMap(ep -> ep.getResolved(preferIpv4)).ifPresent(ep -> sb.append("endpoint=").append(ep).append('\n'));
+        endpoint.flatMap(ep -> ep.getResolved(preferIpv4, context)).ifPresent(ep -> sb.append("endpoint=").append(ep).append('\n'));
         persistentKeepalive.ifPresent(pk -> sb.append("persistent_keepalive_interval=").append(pk).append('\n'));
         preSharedKey.ifPresent(psk -> sb.append("preshared_key=").append(psk.toHex()).append('\n'));
         return sb.toString();
