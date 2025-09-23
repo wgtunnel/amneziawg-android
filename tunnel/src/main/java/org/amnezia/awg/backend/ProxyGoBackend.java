@@ -54,7 +54,7 @@ public final class ProxyGoBackend extends AbstractBackend {
             Log.d(TAG, "Proxy tunnel: Refreshed VpnService and protector for kill switch");
         }
 
-        final String quickConfig = startConfig.toAwgQuickStringResolved(false, true, tunnel.isIpv4ResolutionPreferred());
+        final String quickConfig = startConfig.toAwgQuickStringResolved(false, true, tunnel.isIpv4ResolutionPreferred(), context);
         tunnelActionHandler.runPreUp(config.getInterface().getPreUp());
         String packageName = context.getPackageName();
         // simple flag to tell proxy backend to bypass netstack sockets or not
@@ -124,7 +124,7 @@ public final class ProxyGoBackend extends AbstractBackend {
     @Override
     public boolean updateActiveTunnelPeers(Config config) throws UnsupportedOperationException {
         if (currentTunnelHandle == -1) throw new UnsupportedOperationException();
-        int completed = awgUpdateProxyTunnelPeers(currentTunnelHandle, config.toAwgQuickStringResolved(false, false,  currentTunnel.isIpv4ResolutionPreferred()));
+        int completed = awgUpdateProxyTunnelPeers(currentTunnelHandle, config.toAwgQuickStringResolved(false, false,  currentTunnel.isIpv4ResolutionPreferred(), context));
         return completed == 0;
 
     }

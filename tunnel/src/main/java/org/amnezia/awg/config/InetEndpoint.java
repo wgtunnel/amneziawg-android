@@ -122,7 +122,7 @@ public final class InetEndpoint {
      * @param preferIpv4 whether ipv4 resolution should be preferred over the default ipv6
      * @return the resolved endpoint, or {@link Optional#empty()}
      */
-    public Optional<InetEndpoint> getResolved(Boolean preferIpv4) {
+    public Optional<InetEndpoint> getResolved(Boolean preferIpv4, Context context) {
         Log.d(TAG, "Resolving with ipv4 preferred: " + preferIpv4 + " and resolver: " + currentResolver.getClass().getSimpleName());
         if (isResolved) return Optional.of(this);
         Instant now = Instant.now();
@@ -138,35 +138,38 @@ public final class InetEndpoint {
             }
 
             try {
-                final InetAddress[] candidates = currentResolver.resolve(host);
-                if (candidates == null || candidates.length == 0) {
+                InetAddress[] candidates = currentResolver.resolve(host);
+                if (candidates.length == 0) {
                     Log.w(TAG, "No addresses resolved for host: " + host);
                     lastFailedResolution = now;
                     return Optional.empty();
                 }
 
-                int ipv4Count = 0;
-                String first = "none";
-                for (InetAddress addr : candidates) {
-                    if (addr instanceof Inet4Address) ipv4Count++;
-                    if (first.equals("none")) first = addr.getHostAddress();
+                if (currentResolver instanceof DoHResolver) {
+                    boolean hasIpv6 = NetworkUtils.hasGlobalIpv6(context);
+                    List<InetAddress> filtered = new ArrayList<>();
+                    for (InetAddress addr : candidates) {
+                        if (addr instanceof Inet4Address || (addr instanceof Inet6Address && hasIpv6)) {
+                            filtered.add(addr);
+                        }
+                    }
+                    candidates = filtered.toArray(new InetAddress[0]);
+                    if (candidates.length == 0) {
+                        lastFailedResolution = now;
+                        return Optional.empty();
+                    }
                 }
 
-                // Separate caches
                 InetEndpoint ipv4Ep = null;
                 InetEndpoint ipv6Ep = null;
                 for (InetAddress addr : candidates) {
                     String addrStr = addr.getHostAddress();
                     if (addr instanceof Inet4Address && ipv4Ep == null) {
                         ipv4Ep = new InetEndpoint(addrStr, true, port);
-                    } else if (ipv6Ep == null) {  // Assume non-v4 is v6
+                    } else if (addr instanceof Inet6Address && ipv6Ep == null) {
                         ipv6Ep = new InetEndpoint(addrStr, true, port);
                     }
                     if (ipv4Ep != null && ipv6Ep != null) break;
-                }
-                // Fallback: If no IPv4 but want it, use first non-v6 or error
-                if (preferIpv4 && ipv4Ep == null) {
-                    ipv4Ep = new InetEndpoint(candidates[0].getHostAddress(), true, port);
                 }
 
                 // Cache based on family
@@ -178,8 +181,11 @@ public final class InetEndpoint {
                     resolvedIpv6 = ipv6Ep;
                     lastResolutionIpv6 = now;
                 }
-                // Return preferred
-                InetEndpoint toReturn = preferIpv4 ? ipv4Ep : ipv6Ep;
+
+                // Select with fallback
+                InetEndpoint preferredEp = preferIpv4 ? ipv4Ep : ipv6Ep;
+                InetEndpoint fallbackEp = preferIpv4 ? ipv6Ep : ipv4Ep;
+                InetEndpoint toReturn = (preferredEp != null) ? preferredEp : fallbackEp;
                 return Optional.ofNullable(toReturn);
             } catch (final UnknownHostException e) {
                 Log.w(TAG, "Failed to resolve host " + host + ": " + e.getMessage());

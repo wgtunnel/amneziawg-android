@@ -43,7 +43,7 @@ public final class GoBackend extends AbstractBackend {
 
         resolvePeerEndpoints(config, tunnel.isIpv4ResolutionPreferred(), true);
 
-        final String goConfig = config.toAwgQuickStringResolved(false, false, tunnel.isIpv4ResolutionPreferred());
+        final String goConfig = config.toAwgQuickStringResolved(false, false, tunnel.isIpv4ResolutionPreferred(), context);
         final VpnService.Builder builder = service.getBuilder();
         builder.setSession(tunnel.getName());
 
@@ -115,7 +115,7 @@ public final class GoBackend extends AbstractBackend {
     @Override
     public boolean updateActiveTunnelPeers(Config config) throws UnsupportedOperationException {
         if (currentTunnelHandle == -1) throw new UnsupportedOperationException();
-        int completed = awgUpdateTunnelPeers(currentTunnelHandle, config.toAwgQuickStringResolved(false, false, currentTunnel.isIpv4ResolutionPreferred()));
+        int completed = awgUpdateTunnelPeers(currentTunnelHandle, config.toAwgQuickStringResolved(false, false, currentTunnel.isIpv4ResolutionPreferred(), context));
         return completed == 0;
 
     }
