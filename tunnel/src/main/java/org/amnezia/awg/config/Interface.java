@@ -66,8 +66,6 @@ public final class Interface {
     private final Optional<String> j2;
     private final Optional<String> j3;
     private final Optional<Integer> itime;
-    private final Set<String> blockedDomains;
-    private final Optional<Boolean> domainBlockingEnabled;
     private final List<String> preUp;
     private final List<String> postUp;
     private final List<String> preDown;
@@ -110,8 +108,6 @@ public final class Interface {
         j2 = builder.j2;
         j3 = builder.j3;
         itime = builder.itime;
-        blockedDomains = Collections.unmodifiableSet(new LinkedHashSet<>(builder.blockedDomains));
-        domainBlockingEnabled = builder.domainBlockingEnabled;
         preUp = List.copyOf(builder.preUp);
         postUp = List.copyOf(builder.postUp);
         preDown = List.copyOf(builder.preDown);
@@ -138,12 +134,6 @@ public final class Interface {
                     break;
                 case "dns":
                     builder.parseDnsServers(attribute.getValue());
-                    break;
-                case "blockeddomains":
-                    builder.parseBlockedDomains(attribute.getValue());
-                    break;
-                case "domainblockingenabled":
-                    builder.parseDomainBlockingEnabled(attribute.getValue());
                     break;
                 case "excludedapplications":
                     builder.parseExcludedApplications(attribute.getValue());
@@ -264,8 +254,6 @@ public final class Interface {
                 && j2.equals(other.j2)
                 && j3.equals(other.j3)
                 && itime.equals(other.itime)
-                && blockedDomains.equals(other.blockedDomains)
-                && domainBlockingEnabled.equals(other.domainBlockingEnabled)
                 && preUp.equals(other.preUp)
                 && postUp.equals(other.postUp)
                 && preDown.equals(other.preDown)
@@ -511,26 +499,6 @@ public final class Interface {
         return itime;
     }
 
-
-    /**
-     * Returns the list of blocked domains associated with the interface.
-     *
-     * @return a set of strings
-     */
-    public Set<String> getBlockedDomains() {
-        // The collection is already immutable.
-        return blockedDomains;
-    }
-
-    /**
-     * Returns whether domain blocking is enabled for the interface.
-     *
-     * @return the preferIpv6Dns, or {@code Optional.empty()} if none is configured
-     */
-    public Optional<Boolean> getDomainBlockingEnabled() {
-        return domainBlockingEnabled;
-    }
-
     public List<String> getPreUp() {
         return preUp;
     }
@@ -577,8 +545,6 @@ public final class Interface {
         hash = 31 * hash + j2.hashCode();
         hash = 31 * hash + j3.hashCode();
         hash = 31 * hash + itime.hashCode();
-        hash = 31 * hash + blockedDomains.hashCode();
-        hash = 31 * hash + domainBlockingEnabled.hashCode();
         hash = 31 * hash + preUp.hashCode();
         hash = 31 * hash + postUp.hashCode();
         hash = 31 * hash + preDown.hashCode();
@@ -616,11 +582,7 @@ public final class Interface {
             dnsServerStrings.addAll(dnsSearchDomains);
             sb.append("DNS = ").append(Attribute.join(dnsServerStrings)).append('\n');
         }
-        if (!blockedDomains.isEmpty())
-            sb.append("BlockedDomains = ").append(Attribute.join(blockedDomains)).append('\n');
-        domainBlockingEnabled.ifPresent(pref -> sb.append("DomainBlockingEnabled = ").append(pref).append('\n'));
-        if (!excludedApplications.isEmpty())
-            sb.append("ExcludedApplications = ").append(Attribute.join(excludedApplications)).append('\n');
+        sb.append("ExcludedApplications = ").append(Attribute.join(excludedApplications)).append('\n');
         if (!includedApplications.isEmpty())
             sb.append("IncludedApplications = ").append(Attribute.join(includedApplications)).append('\n');
         listenPort.ifPresent(lp -> sb.append("ListenPort = ").append(lp).append('\n'));
@@ -720,55 +682,6 @@ public final class Interface {
         return sb.toString();
     }
 
-    /**
-     * Creates a new Interface with updated DNS settings, copying all other fields from this instance.
-     *
-     * @param protocol the new DNS protocol
-     * @param additionalServers the new additional DNS servers
-     * @param preferIpv6 whether to prefer IPv6 DNS
-     * @return a new Interface with the updated DNS settings
-     */
-    public Interface withUpdatedDns(DnsProtocol protocol, Set<String> additionalServers, boolean preferIpv6) {
-        Builder builder = new Builder();
-        builder.addresses.addAll(this.addresses);
-        builder.dnsServers.addAll(this.dnsServers);
-        builder.dnsSearchDomains.addAll(this.dnsSearchDomains);
-        builder.excludedApplications.addAll(this.excludedApplications);
-        builder.includedApplications.addAll(this.includedApplications);
-        builder.keyPair = this.keyPair;
-        builder.listenPort = this.listenPort;
-        builder.mtu = this.mtu;
-        builder.junkPacketCount = this.junkPacketCount;
-        builder.junkPacketMinSize = this.junkPacketMinSize;
-        builder.junkPacketMaxSize = this.junkPacketMaxSize;
-        builder.initPacketJunkSize = this.initPacketJunkSize;
-        builder.responsePacketJunkSize = this.responsePacketJunkSize;
-        builder.initPacketMagicHeader = this.initPacketMagicHeader;
-        builder.responsePacketMagicHeader = this.responsePacketMagicHeader;
-        builder.underloadPacketMagicHeader = this.underloadPacketMagicHeader;
-        builder.transportPacketMagicHeader = this.transportPacketMagicHeader;
-        builder.i1 = this.i1;
-        builder.i2 = this.i2;
-        builder.i3 = this.i3;
-        builder.i4 = this.i4;
-        builder.i5 = this.i5;
-        builder.j1 = this.j1;
-        builder.j2 = this.j2;
-        builder.j3 = this.j3;
-        builder.itime = this.itime;
-        builder.blockedDomains.addAll(additionalServers);
-        builder.domainBlockingEnabled = Optional.of(preferIpv6);
-        builder.preUp.addAll(this.preUp);
-        builder.postUp.addAll(this.postUp);
-        builder.preDown.addAll(this.preDown);
-        builder.postDown.addAll(this.postDown);
-        try {
-            return builder.build();
-        } catch (BadConfigException e) {
-            throw new IllegalStateException("Failed to build updated Interface", e);
-        }
-    }
-
     @SuppressWarnings("UnusedReturnValue")
     public static final class Builder {
         // Defaults to an empty set.
@@ -823,10 +736,6 @@ public final class Interface {
         private Optional<String> j3 = Optional.empty();
         // Defaults to not present.
         private Optional<Integer> itime = Optional.empty();
-        // Defaults to an empty set.
-        private final Set<String> blockedDomains = new LinkedHashSet<>();
-        // Defaults to not present.
-        private Optional<Boolean> domainBlockingEnabled = Optional.empty();
         private final List<String> preUp = new ArrayList<>();
         // Defaults to empty list
         private final List<String> postUp = new ArrayList<>();
@@ -956,27 +865,6 @@ public final class Interface {
                 return this;
             } catch (final ParseException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.DNS, e);
-            }
-        }
-
-        public Builder parseBlockedDomains(final CharSequence blockedDomains) {
-            for (final String domain : Attribute.split(blockedDomains)) {
-                addBlockedDomains(domain);
-            }
-            return this;
-        }
-
-        private Builder addBlockedDomains(final String dnsServer) {
-            blockedDomains.add(dnsServer);
-            return this;
-        }
-
-        public Builder parseDomainBlockingEnabled(final String domainBlockingEnabled) throws BadConfigException {
-            try {
-                this.domainBlockingEnabled = Optional.of(Boolean.parseBoolean(domainBlockingEnabled));
-                return this;
-            } catch (Exception e) {
-                throw new BadConfigException(Section.INTERFACE, Location.TOP_LEVEL, Reason.INVALID_VALUE, domainBlockingEnabled);
             }
         }
 
@@ -1331,6 +1219,60 @@ public final class Interface {
                 throw new BadConfigException(Section.INTERFACE, Location.ITIME,
                         Reason.INVALID_VALUE, String.valueOf(itime));
             this.itime = itime == 0 ? Optional.empty() : Optional.of(itime);
+            return this;
+        }
+
+        public Builder setAddresses(final Collection<InetNetwork> addresses) {
+            this.addresses.clear();
+            this.addresses.addAll(addresses);
+            return this;
+        }
+
+        public Builder setDnsServers(final Collection<? extends InetAddress> dnsServers) {
+            this.dnsServers.clear();
+            this.dnsServers.addAll(dnsServers);
+            return this;
+        }
+
+        public Builder setDnsSearchDomains(final Collection<String> dnsSearchDomains) {
+            this.dnsSearchDomains.clear();
+            this.dnsSearchDomains.addAll(dnsSearchDomains);
+            return this;
+        }
+
+        public Builder setExcludedApplications(final Collection<String> excludedApplications) {
+            this.excludedApplications.clear();
+            this.excludedApplications.addAll(excludedApplications);
+            return this;
+        }
+
+        public Builder setIncludedApplications(final Collection<String> includedApplications) {
+            this.includedApplications.clear();
+            this.includedApplications.addAll(includedApplications);
+            return this;
+        }
+
+        public Builder setPreUp(final List<String> preUp) {
+            this.preUp.clear();
+            this.preUp.addAll(preUp);
+            return this;
+        }
+
+        public Builder setPostUp(final List<String> postUp) {
+            this.postUp.clear();
+            this.postUp.addAll(postUp);
+            return this;
+        }
+
+        public Builder setPreDown(final List<String> preDown) {
+            this.preDown.clear();
+            this.preDown.addAll(preDown);
+            return this;
+        }
+
+        public Builder setPostDown(final List<String> postDown) {
+            this.postDown.clear();
+            this.postDown.addAll(postDown);
             return this;
         }
     }
