@@ -20,12 +20,17 @@ export GOARCH := $(NDK_GO_ARCH_MAP_$(ANDROID_ARCH_NAME))
 export GOOS := android
 export CGO_ENABLED := 1
 
-GO_VERSION := 1.24.2
+GO_VERSION := 1.25.1
+GO_DIR := $(BUILDDIR)/go-$(GO_VERSION)
+
+export GOROOT := $(GO_DIR)
+export PATH := $(GO_DIR)/bin:$(PATH)
+
 GO_PLATFORM := $(shell uname -s | tr '[:upper:]' '[:lower:]')-$(NDK_GO_ARCH_MAP_$(shell uname -m))
 GO_TARBALL := go$(GO_VERSION).$(GO_PLATFORM).tar.gz
-GO_HASH_darwin-amd64 := 238d9c065d09ff6af229d2e3b8b5e85e688318d69f4006fb85a96e41c216ea83
-GO_HASH_darwin-arm64 := b70f8b3c5b4ccb0ad4ffa5ee91cd38075df20fdbd953a1daedd47f50fbcff47a
-GO_HASH_linux-amd64 := 68097bd680839cbc9d464a0edce4f7c333975e27a90246890e9f1078c7e702ad
+GO_HASH_darwin-amd64 := 1d622468f767a1b9fe1e1e67bd6ce6744d04e0c68712adc689748bbeccb126bb
+GO_HASH_darwin-arm64 := 68deebb214f39d542e518ebb0598a406ab1b5a22bba8ec9ade9f55fb4dd94a6c
+GO_HASH_linux-amd64 := 7716a0d940a0f6ae8e1f3b3f4f36299dc53e31b16840dbd171254312c41ca12e
 
 default: $(DESTDIR)/libam-go.so
 

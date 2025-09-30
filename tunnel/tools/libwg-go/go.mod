@@ -1,6 +1,6 @@
 module github.com/amnezia-vpn/amneziawg-android
 
-go 1.25
+go 1.25.1
 
 require (
 	github.com/amnezia-vpn/amneziawg-go v0.2.13

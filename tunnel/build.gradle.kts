@@ -1,5 +1,6 @@
 @file:Suppress("UnstableApiUsage")
 
+import com.android.build.gradle.tasks.ExternalNativeBuildTask
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 val pkg: String = providers.gradleProperty("amneziawgPackageName").get()
@@ -67,6 +68,20 @@ android {
             withJavadocJar()
             withSourcesJar()
         }
+    }
+}
+
+tasks.register<Exec>("forceGoRebuild") {
+    doFirst {
+        file("tools/libwg-go/vpn/vpn.go").setLastModified(System.currentTimeMillis())
+    }
+    workingDir = file("tools/libwg-go")
+    commandLine = listOf("rm", "-f", "build/go-1.25.1/.prepared")
+}
+
+afterEvaluate {
+    tasks.named("assembleRelease").configure {
+        dependsOn("forceGoRebuild")
     }
 }
 
