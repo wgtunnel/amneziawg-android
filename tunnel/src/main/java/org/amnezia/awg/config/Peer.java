@@ -315,5 +315,11 @@ public final class Peer {
             this.publicKey = publicKey;
             return this;
         }
+
+        public Builder setAllowedIps(final Collection<InetNetwork> allowedIps) {
+            this.allowedIps.clear();
+            this.allowedIps.addAll(allowedIps);
+            return this;
+        }
     }
 }

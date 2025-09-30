@@ -582,7 +582,8 @@ public final class Interface {
             dnsServerStrings.addAll(dnsSearchDomains);
             sb.append("DNS = ").append(Attribute.join(dnsServerStrings)).append('\n');
         }
-        sb.append("ExcludedApplications = ").append(Attribute.join(excludedApplications)).append('\n');
+        if(!excludedApplications.isEmpty())
+            sb.append("ExcludedApplications = ").append(Attribute.join(excludedApplications)).append('\n');
         if (!includedApplications.isEmpty())
             sb.append("IncludedApplications = ").append(Attribute.join(includedApplications)).append('\n');
         listenPort.ifPresent(lp -> sb.append("ListenPort = ").append(lp).append('\n'));
