@@ -7,27 +7,23 @@ package org.amnezia.awg.config;
 
 import android.content.Context;
 import android.util.Log;
-import okhttp3.internal.platform.AndroidPlatform;
+import androidx.annotation.Nullable;
+import inet.ipaddr.IPAddress;
+import inet.ipaddr.IPAddressString;
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.dnsoverhttps.DnsOverHttps;
 import org.amnezia.awg.util.NonNullForAll;
 
+import javax.net.SocketFactory;
+import java.io.IOException;
 import java.net.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
-import androidx.annotation.Nullable;
-
-import okhttp3.HttpUrl;
-import okhttp3.OkHttpClient;
-import okhttp3.dnsoverhttps.DnsOverHttps;
-import java.util.List;
-import java.io.IOException;
-import javax.net.SocketFactory;
 
 /**
  * An external endpoint (host and port) used to connect to an AmneziaWG {@link Peer}.
@@ -232,9 +228,25 @@ public final class InetEndpoint {
         }
     }
 
+    public static String removeBrackets(String host) {
+        if (host.startsWith("[") && host.endsWith("]")) {
+            return host.substring(1, host.length() - 1);
+        }
+        return host;
+    }
+
     public record DoHResolver(Optional<String> dohUrl, Optional<SocketFactory> socketFactory) implements Resolver {
         @Override
         public InetAddress[] resolve(String host) throws UnknownHostException {
+            String sanitizedHost = removeBrackets(host);
+            IPAddress address = new IPAddressString(sanitizedHost).getAddress();
+            if (address != null) {
+                byte[] bytes = address.getBytes();
+                InetAddress ipAddr = InetAddress.getByAddress(null, bytes);
+                Log.i(TAG, "Skipping DoH for static IP endpoint ");
+                return new InetAddress[] { ipAddr };
+            }
+
             Log.i(TAG, "Using DoH URL: " + dohUrl.orElse(preferredDoHUrl));
             Log.i(TAG, "SocketFactory in use: " + (socketFactory.map(factory -> factory.getClass().getSimpleName()).orElse("none")));
 

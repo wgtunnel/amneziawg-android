@@ -1,6 +1,5 @@
 @file:Suppress("UnstableApiUsage")
 
-import com.android.build.gradle.tasks.ExternalNativeBuildTask
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 val pkg: String = providers.gradleProperty("amneziawgPackageName").get()
@@ -99,6 +98,7 @@ dependencies {
     //dns
     implementation(libs.okhttp.dnsoverhttps)
     implementation(libs.okhttp)
+    implementation(libs.ipaddress)
 }
 
 publishing {
