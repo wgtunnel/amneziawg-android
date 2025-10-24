@@ -892,9 +892,7 @@ public final class Interface {
         public Builder parseMtu(final String mtu) throws BadConfigException {
             try {
                 int m = Integer.parseInt(mtu);
-                if (m < 0) {
-                    throw new BadConfigException(Section.INTERFACE, Location.MTU, Reason.INVALID_VALUE, mtu);
-                }
+                if(m < 68 || m > 65535) throw new BadConfigException(Section.INTERFACE, Location.MTU, Reason.INVALID_VALUE, mtu);
                 return setMtu(m);
             } catch (final NumberFormatException e) {
                 throw new BadConfigException(Section.INTERFACE, Location.MTU, mtu, e);
