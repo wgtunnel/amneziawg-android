@@ -12,7 +12,11 @@ import org.amnezia.awg.config.Config;
 import org.amnezia.awg.config.proxy.Socks5Proxy;
 import org.amnezia.awg.util.NonNullForAll;
 
+import java.io.IOException;
+import java.net.ServerSocket;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import static org.amnezia.awg.ProxyGoBackend.*;
 
@@ -24,35 +28,53 @@ public final class ProxyGoBackend extends AbstractBackend {
         super(context, tunnelActionHandler);
     }
 
+    record KillSwitchContext(VpnService vpnService, int port, Config config) {}
+
+
+    private int getAvailablePort() throws IOException {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            socket.setReuseAddress(true);
+            return socket.getLocalPort();
+        }
+    }
+
+    private KillSwitchContext setupKillSwitch(Config config) throws BackendException {
+        if (VpnService.prepare(context) != null)
+            throw new BackendException(BackendException.Reason.VPN_NOT_AUTHORIZED);
+        try {
+            Log.d(TAG, "Kill switch: Refreshed VpnService and protector");
+            VpnService vpnService = startVpnService(this);
+            int port = getAvailablePort();
+
+            Config startConfig = new Config.Builder()
+                    .setDnsSettings(config.getDnsSettings())
+                    .setInterface(config.getInterface())
+                    .addPeers(config.getPeers())
+                    .addProxies(List.of(new Socks5Proxy(
+                            String.format("%s:%d", LOCALHOST, port),
+                            USERNAME,
+                            PASSWORD
+                    )))
+                    .build();
+            return new KillSwitchContext(vpnService, port, startConfig);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start kill switch", e);
+            throw new BackendException(BackendException.Reason.UNABLE_TO_START_VPN);
+        }
+    }
+
+
     @Override
     protected void configureAndStartTunnel(final Tunnel tunnel, final Config config) throws Exception {
         if (currentTunnelHandle != -1) {
             Log.w(TAG, "Tunnel already up");
             return;
         }
-        resolvePeerEndpoints(config, tunnel.isIpv4ResolutionPreferred(), true);
-
-        Config startConfig = config;
-
-        // overwrite proxy settings for lockdown mode
         boolean isKillSwitch = backendMode instanceof BackendMode.KillSwitch;
-        if (isKillSwitch) startConfig = new Config.Builder()
-                .setDnsSettings(config.getDnsSettings())
-                .setInterface(config.getInterface())
-                .addPeers(config.getPeers())
-                .addProxies(List.of(new Socks5Proxy(
-                        String.format("%s:%d", LOCALHOST, PORT),
-                        USERNAME,
-                        PASSWORD
-                ))).build();
+        KillSwitchContext ks = isKillSwitch ? setupKillSwitch(config) : null;
+        Config startConfig = (ks != null) ? ks.config() : config;
 
-        if (isKillSwitch) {
-            if (VpnService.prepare(context) != null) {
-                throw new BackendException(BackendException.Reason.VPN_NOT_AUTHORIZED);
-            }
-            startVpnService(this);  // fetch and sets owner/protector
-            Log.d(TAG, "Proxy tunnel: Refreshed VpnService and protector for kill switch");
-        }
+        resolvePeerEndpoints(config, tunnel.isIpv4ResolutionPreferred(), true);
 
         final String quickConfig = startConfig.toAwgQuickStringResolved(false, true, tunnel.isIpv4ResolutionPreferred(), context);
         tunnelActionHandler.runPreUp(config.getInterface().getPreUp());
@@ -64,6 +86,7 @@ public final class ProxyGoBackend extends AbstractBackend {
         if (currentTunnelHandle < 0) {
             throw new BackendException(BackendException.Reason.GO_ACTIVATION_ERROR_CODE, currentTunnelHandle);
         }
+        if (ks != null) ks.vpnService.startHevTunnel(ks.port);
     }
 
     @Override
@@ -75,6 +98,11 @@ public final class ProxyGoBackend extends AbstractBackend {
         tunnelActionHandler.runPreDown(config != null ? config.getInterface().getPreDown() : null);
         awgResetJNIGlobals();
         awgStopProxy();
+        if(backendMode instanceof BackendMode.KillSwitch) try {
+            vpnService.get(2_000L, TimeUnit.SECONDS).stopHevTunnel();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to hev tunnel", e);
+        }
         currentTunnelHandle = -1;
         tunnelActionHandler.runPostDown(config != null ? config.getInterface().getPostDown() : null);
     }
@@ -82,37 +110,29 @@ public final class ProxyGoBackend extends AbstractBackend {
     @Override
     protected BackendMode setBackendModeInternal(final BackendMode backendMode) throws Exception {
         Log.d(TAG, "Setting backend mode: " + backendMode + "current " + this.backendMode);
-        boolean disableLockdown = backendMode instanceof BackendMode.Inactive;
-        boolean isLockdownActive = vpnService.isDone();
-        if(disableLockdown &&
-                this.backendMode instanceof BackendMode.Inactive) return backendMode;
+        Optional<VpnService> service = vpnService.isDone() ? Optional.ofNullable(vpnService.get(2, TimeUnit.SECONDS)) : Optional.empty();
 
-        if(backendMode instanceof BackendMode.KillSwitch update &&
-                this.backendMode instanceof BackendMode.KillSwitch current) {
-            if(current.getAllowedIps()
-                    .equals(update.getAllowedIps())) {
-                return backendMode;
+        // config already matches and up, return
+        if(backendMode instanceof BackendMode.KillSwitch update) {
+            if(service.isPresent() && this.backendMode instanceof BackendMode.KillSwitch current) {
+                if(current.getAllowedIps()
+                        .equals(update.getAllowedIps()) && current.isMetered() == update.isMetered() && current.isDualStack() == update.isDualStack()) {
+                    return current;
+                } else {
+                    service.get().activateKillSwitch(update.getAllowedIps(), update.isMetered(), update.isDualStack());
+                    return update;
+                }
+            } else {
+                Log.d(TAG, "Getting the service");
+                VpnService newService = startVpnService(this);
+                newService.activateKillSwitch(update.getAllowedIps(), update.isMetered(), update.isDualStack());
+                return update;
             }
-        }
-        Log.d(TAG, "Checking if vpnservice is active");
-        // nothing to do
-        if(disableLockdown && !isLockdownActive) return backendMode;
-
-        Log.d(TAG, "Getting the service");
-        VpnService service = startVpnService(this);
-
-        if (backendMode instanceof BackendMode.KillSwitch) {
-            service.setOwner(this);
-        }
-
-        if(disableLockdown) {
-            Log.d(TAG, "Shutting it down");
-            service.shutdown();
+        } else {
+            // mode inactive, shutdown
+            service.ifPresent(VpnService::shutdown);
             return backendMode;
         }
-        if(isLockdownActive) service.shutdown();
-        if (backendMode instanceof BackendMode.KillSwitch mode) service.activateKillSwitch(mode.getAllowedIps());
-        return backendMode;
     }
 
     @Override

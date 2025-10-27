@@ -78,8 +78,7 @@ public final class GoBackend extends AbstractBackend {
 
         builder.setMtu(config.getInterface().getMtu().orElse(1280));
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
-            builder.setMetered(false);
+        builder.setMetered(tunnel.isMetered());
 
         service.setUnderlyingNetworks(null);
         builder.setBlocking(true);
