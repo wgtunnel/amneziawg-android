@@ -107,17 +107,27 @@ public interface Backend {
          */
         public static final class KillSwitch extends BackendMode {
             private final Set<String> allowedIps;
+            private final Boolean metered;
+            private final Boolean dualStack;
 
             /**
              *  @param allowedIps should only be a list of private IPs, or it undermines this mode.
+             *  @param metered if kill switch tunnels should be considered metered by Android.
+             *  @param dualStack if the kill switch should support dual-stack configs.
              */
-            public KillSwitch(Set<String> allowedIps) {
+            public KillSwitch(Set<String> allowedIps, Boolean metered, Boolean dualStack) {
                 this.allowedIps = Set.copyOf(allowedIps);
+                this.metered = metered;
+                this.dualStack = dualStack;
             }
 
             public Set<String> getAllowedIps() {
                 return allowedIps;
             }
+
+            public Boolean isMetered() { return metered; }
+
+            public Boolean isDualStack() { return dualStack; }
 
             @Override
             public boolean equals(Object o) {

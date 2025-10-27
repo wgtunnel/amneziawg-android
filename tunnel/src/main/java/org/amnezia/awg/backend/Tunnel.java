@@ -5,11 +5,8 @@
 
 package org.amnezia.awg.backend;
 
-import androidx.annotation.Nullable;
-import org.amnezia.awg.config.DnsSettings;
 import org.amnezia.awg.util.NonNullForAll;
 
-import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
@@ -45,6 +42,13 @@ public interface Tunnel {
      * @return true if ipv4 is preferred.
      */
     Boolean isIpv4ResolutionPreferred();
+
+    /**
+     * Whether this tunnel is metered.
+     *
+     * @return true if metered, false if unmetered.
+     */
+    Boolean isMetered();
 
     /**
      * Enum class to represent all possible states of a {@link Tunnel}.

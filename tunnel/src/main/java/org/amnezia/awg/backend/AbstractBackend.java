@@ -13,7 +13,10 @@ import android.util.Log;
 import androidx.annotation.Nullable;
 import com.getkeepsafe.relinker.ReLinker;
 import okhttp3.internal.platform.PlatformRegistry;
-import org.amnezia.awg.config.*;
+import org.amnezia.awg.config.Config;
+import org.amnezia.awg.config.DnsSettings;
+import org.amnezia.awg.config.InetEndpoint;
+import org.amnezia.awg.config.Peer;
 import org.amnezia.awg.crypto.Key;
 import org.amnezia.awg.crypto.KeyFormatException;
 import org.amnezia.awg.hevtunnel.TProxyService;
@@ -23,14 +26,17 @@ import javax.net.SocketFactory;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.*;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static org.amnezia.awg.GoBackend.*;
+import static org.amnezia.awg.GoBackend.awgTurnOff;
+import static org.amnezia.awg.GoBackend.awgVersion;
 import static org.amnezia.awg.ProxyGoBackend.*;
 
 @NonNullForAll
@@ -45,7 +51,8 @@ public abstract class AbstractBackend implements Backend {
     protected static final String USERNAME = "local";
     protected static final String PASSWORD = UUID.randomUUID().toString();
     protected static final String LOCALHOST = "127.0.0.1";
-    protected static final int PORT = 25344;
+    private static final String IPV4_INTERFACE_ADDRESS = "10.0.0.1";
+    private static final String IPV6_INTERFACE_ADDRESS = "2001:db8::1";
 
     protected final Context context;
     protected final TunnelActionHandler tunnelActionHandler;
@@ -191,7 +198,6 @@ public abstract class AbstractBackend implements Backend {
             Log.d(TAG, "Requesting to start VpnService");
             context.startService(new Intent(context, VpnService.class));
         }
-        // Always fetch and set owner—no early return
         VpnService service;
         try {
             service = vpnService.get(2, TimeUnit.SECONDS);
@@ -460,16 +466,16 @@ public abstract class AbstractBackend implements Backend {
                     Log.d(TAG, "Skipping awgSetSocketProtector (not ProxyGoBackend)");
                 }
             } catch (final Exception e) {
-                Log.e(TAG, "Exception in setOwner", e);  // NEW: Promote to ERROR for visibility
+                Log.e(TAG, "Exception in setOwner", e);
             }
         }
 
-        protected void activateKillSwitch(Set<String> allowedIps) throws Exception {
+        protected void activateKillSwitch(final Set<String> allowedIps, final Boolean metered, final Boolean dualStack) throws Exception {
             Builder builder = new Builder();
             Log.d(TAG, "Starting kill switch with allowedIps: " + allowedIps);
             builder.setSession("Lockdown");
-            builder.addAddress("10.0.0.1", 32); // Dummy IPv4
-//            builder.addAddress("2001:db8::1", 128); // Dummy IPv6 (non-routable, per RFC 3849)
+            builder.addAddress(IPV4_INTERFACE_ADDRESS, 32); // Dummy IPv4
+            if(dualStack) builder.addAddress(IPV6_INTERFACE_ADDRESS, 128); // Dummy IPv6 (non-routable, per RFC 3849)
             if (allowedIps.isEmpty()) {
                 builder.addRoute("0.0.0.0", 0);
             } else {
@@ -480,6 +486,8 @@ public abstract class AbstractBackend implements Backend {
                 });
             }
 
+            builder.setMetered(metered);
+
             builder.addRoute("::", 0);
             builder.setMtu(MTU);
             builder.addDnsServer("1.1.1.1");
@@ -488,15 +496,6 @@ public abstract class AbstractBackend implements Backend {
             if (fd == null) {
                 throw new BackendException(BackendException.Reason.VPN_NOT_AUTHORIZED);
             }
-
-            hevStartThread = new Thread(() -> {
-                try {
-                    startHevTunnel();
-                } catch (IOException e) {
-                    Log.e(TAG, "Failed to start hev tunnel", e);
-                }
-            });
-            hevStartThread.start();
         }
 
         @Override
@@ -514,17 +513,7 @@ public abstract class AbstractBackend implements Backend {
         }
 
         private void stopKillSwitch() {
-            TProxyService.TProxyStopService();
-            if (hevStartThread != null && hevStartThread.isAlive()) {
-                hevStartThread.interrupt();
-                try {
-                    hevStartThread.join(2000); // Wait up to 2s for thread to stop
-                } catch (InterruptedException e) {
-                    Log.w(TAG, "Interrupted while joining hev thread", e);
-                    Thread.currentThread().interrupt();
-                }
-                hevStartThread = null;
-            }
+            stopHevTunnel();
             if(fd != null) {
                 Log.d(TAG,"Fd is not null, we need to close it");
                 try {
@@ -537,50 +526,83 @@ public abstract class AbstractBackend implements Backend {
             Log.d(TAG, "Kill switch stopped");
         }
 
-        private void startHevTunnel() throws IOException {
+        private File createHevTunnelConfig(int port) throws IOException {
             File tproxyFile = new File(getCacheDir(), HEV_CONFIG_FILE_NAME);
             String hevConf = String.format("""
-                misc:
-                  task-stack-size: 10240
-                tunnel:
-                  mtu: %d
-                socks5:
-                  address: '%s'
-                  port: %d
-                  username: '%s'
-                  password: '%s'
-                  udp: 'udp'
-                """, MTU, LOCALHOST, PORT, USERNAME, PASSWORD);
+                    misc:
+                      task-stack-size: 24576
+                    tunnel:
+                      mtu: %d
+                      ipv4: '%s'
+                      ipv6: '%s'
+                    socks5:
+                      address: '%s'
+                      port: %d
+                      username: '%s'
+                      password: '%s'
+                      udp: 'udp'
+                    """,
+                    MTU,
+                    IPV4_INTERFACE_ADDRESS,
+                    IPV6_INTERFACE_ADDRESS,
+                    LOCALHOST,
+                    port,
+                    USERNAME,
+                    PASSWORD
+            );
 
             try (FileOutputStream fos = new FileOutputStream(tproxyFile, false)) {
                 fos.write(hevConf.getBytes());
-            } catch (IOException e) {
-                Log.e(TAG, "Failed to write tproxy.conf: " + e.getMessage());
-                throw new IOException("Failed to write tproxy.conf", e);
             }
+            return tproxyFile;
+        }
 
-            while (!Thread.currentThread().isInterrupted()) {
-                try (Socket socket = new Socket()) {
-                    socket.connect(new InetSocketAddress(LOCALHOST, PORT), 1000);
-                    Log.d(TAG, "SOCKS5 proxy is up, starting hev-socks5-tunnel...");
-                    if(fd != null) {
-                        // use dup, as hev expects java side to manage closure
-                        TProxyService.TProxyStartService(tproxyFile.getAbsolutePath(), fd.getFd());
-                    }
-                    return;  // Success, exit the method
-                } catch (IOException e) {
-                    Log.d(TAG, "SOCKS5 proxy not ready yet, retrying...");
-                }
-
+        void stopHevTunnel() {
+            TProxyService.TProxyStopService();
+            if (hevStartThread != null && hevStartThread.isAlive()) {
+                hevStartThread.interrupt();
                 try {
-                    Thread.sleep(3000);
-                } catch (InterruptedException ie) {
+                    hevStartThread.join(2000);
+                } catch (InterruptedException e) {
+                    Log.w(TAG, "Interrupted while joining hev thread", e);
                     Thread.currentThread().interrupt();
-                    Log.d(TAG, "Hev start interrupted");
-                    return;  // Exit on interrupt
                 }
+                hevStartThread = null;
             }
         }
+
+        void startHevTunnel(int port) {
+            hevStartThread = new Thread(() -> {
+                try {
+                    if (fd == null) throw new IOException("Failed to start hev tunnel, no tunnel interface fd available");
+                    File configFile = createHevTunnelConfig(port);
+                    while (!Thread.currentThread().isInterrupted()) {
+                        try (Socket socket = new Socket()) {
+                            // check for socks5 server to be up
+                            socket.connect(new InetSocketAddress(LOCALHOST, port), 1_000);
+                            Log.d(TAG, "SOCKS5 proxy is up, starting hev-socks5-tunnel...");
+                            TProxyService.TProxyStartService(configFile.getAbsolutePath(), fd.getFd());
+                            Log.d(TAG, "Hev tunnel started");
+                            return;
+                        } catch (IOException e) {
+                            try {
+                                Thread.sleep(500);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                Log.d(TAG, "Hev start interrupted");
+                                return;  // Exit on interrupt
+                            }
+                            Log.d(TAG, "SOCKS5 proxy not ready yet, retrying...");
+                        }
+                    }
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to start hev tunnel", e);
+                }
+            });
+            hevStartThread.start();
+        }
+
+
 
         private class ProtectedSocketFactory extends SocketFactory {
             private static final int PROTECT_RETRY_ATTEMPTS = 1;
