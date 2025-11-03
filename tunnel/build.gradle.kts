@@ -98,7 +98,6 @@ dependencies {
     //dns
     implementation(libs.okhttp.dnsoverhttps)
     implementation(libs.okhttp)
-    implementation(libs.ipaddress)
 }
 
 publishing {

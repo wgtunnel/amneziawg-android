@@ -8,8 +8,6 @@ package org.amnezia.awg.config;
 import android.content.Context;
 import android.util.Log;
 import androidx.annotation.Nullable;
-import inet.ipaddr.IPAddress;
-import inet.ipaddr.IPAddressString;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.dnsoverhttps.DnsOverHttps;
@@ -235,14 +233,26 @@ public final class InetEndpoint {
         return host;
     }
 
+    public static Boolean isIpv6Host(String host) {
+        return host.startsWith("[") && host.endsWith("]");
+    }
+
+    private static final Pattern IPV4_PATTERN = Pattern.compile(
+            "^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]\\d|\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]\\d|\\d)$"
+    );
+
     public record DoHResolver(Optional<String> dohUrl, Optional<SocketFactory> socketFactory) implements Resolver {
+
         @Override
         public InetAddress[] resolve(String host) throws UnknownHostException {
-            String sanitizedHost = removeBrackets(host);
-            IPAddress address = new IPAddressString(sanitizedHost).getAddress();
-            if (address != null) {
-                byte[] bytes = address.getBytes();
-                InetAddress ipAddr = InetAddress.getByAddress(null, bytes);
+            String finalHost = host;
+            boolean isIpAddress = IPV4_PATTERN.matcher(host).matches();
+            if (isIpv6Host(host)) {
+                isIpAddress = true;
+                finalHost = removeBrackets(host);
+            }
+            if (isIpAddress) {
+                InetAddress ipAddr = InetAddress.getByName(finalHost);
                 Log.i(TAG, "Skipping DoH for static IP endpoint ");
                 return new InetAddress[] { ipAddr };
             }
