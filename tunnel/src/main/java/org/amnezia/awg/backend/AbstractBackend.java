@@ -407,8 +407,11 @@ public abstract class AbstractBackend implements Backend {
 
         @Override
         public void onDestroy() {
-            if (owner != null) handleDestroy(owner);
-            vpnService = new CompletableFuture<>();
+            AbstractBackend localOwner = owner;
+            if (localOwner != null) {
+                handleDestroy(localOwner);
+            }
+            shutdown();
             super.onDestroy();
         }
 
