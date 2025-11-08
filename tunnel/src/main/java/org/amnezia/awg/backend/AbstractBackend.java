@@ -7,6 +7,7 @@ package org.amnezia.awg.backend;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.ParcelFileDescriptor;
 import android.util.ArraySet;
 import android.util.Log;
@@ -486,7 +487,9 @@ public abstract class AbstractBackend implements Backend {
                 });
             }
 
-            builder.setMetered(metered);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                builder.setMetered(metered);
+            }
 
             builder.addRoute("::", 0);
             builder.setMtu(MTU);
