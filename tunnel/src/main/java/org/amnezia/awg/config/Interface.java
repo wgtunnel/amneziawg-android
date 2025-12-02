@@ -1029,47 +1029,27 @@ public final class Interface {
         }
 
         public Builder parseSpecialJunkI1(final String specialJunkI1) {
-            if (specialJunkI1.trim().isEmpty()) {
-                this.specialJunkI1 = Optional.empty();
-            } else {
-                this.specialJunkI1 = Optional.of(specialJunkI1.trim());
-            }
+            setSpecialJunkI1(specialJunkI1);
             return this;
         }
 
         public Builder parseSpecialJunkI2(final String specialJunkI2) {
-            if (specialJunkI2.trim().isEmpty()) {
-                this.specialJunkI2 = Optional.empty();
-            } else {
-                this.specialJunkI2 = Optional.of(specialJunkI2.trim());
-            }
+            setSpecialJunkI2(specialJunkI2);
             return this;
         }
 
         public Builder parseSpecialJunkI3(final String specialJunkI3) {
-            if (specialJunkI3.trim().isEmpty()) {
-                this.specialJunkI3 = Optional.empty();
-            } else {
-                this.specialJunkI3 = Optional.of(specialJunkI3.trim());
-            }
+            setSpecialJunkI3(specialJunkI3);
             return this;
         }
 
         public Builder parseSpecialJunkI4(final String specialJunkI4) {
-            if (specialJunkI4.trim().isEmpty()) {
-                this.specialJunkI4 = Optional.empty();
-            } else {
-                this.specialJunkI4 = Optional.of(specialJunkI4.trim());
-            }
+            setSpecialJunkI4(specialJunkI4);
             return this;
         }
 
         public Builder parseSpecialJunkI5(final String specialJunkI5) {
-            if (specialJunkI5.trim().isEmpty()) {
-                this.specialJunkI5 = Optional.empty();
-            } else {
-                this.specialJunkI5 = Optional.of(specialJunkI5.trim());
-            }
+            setSpecialJunkI5(specialJunkI5);
             return this;
         }
 
