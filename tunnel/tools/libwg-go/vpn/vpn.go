@@ -58,7 +58,7 @@ func awgTurnOn(interfaceName string, tunFd int32, settings string, pkgName strin
 
 	shared.LogDebug(tag, "Creating device with domain blocking enabled: %v", conf.Device.DomainBlockingEnabled)
 
-	tunDevice := device.NewDevice(tunnel, conn.NewStdNetBind(), shared.NewLogger("Tun/"+interfaceName), conf.Device.DomainBlockingEnabled, conf.Device.BlockedDomains)
+	tunDevice := device.NewDevice(tunnel, conn.NewStdNetBind(), shared.NewLogger("Tun/"+interfaceName), conf.Device.DomainBlockingEnabled)
 
 	ipcRequest, err := wireproxyawg.CreateIPCRequest(conf.Device, false)
 	if err != nil {

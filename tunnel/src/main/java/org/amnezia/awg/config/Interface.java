@@ -1239,5 +1239,59 @@ public final class Interface {
             }
             return this;
         }
+
+        public Builder setAddresses(final Collection<InetNetwork> addresses) {
+            this.addresses.clear();
+            this.addresses.addAll(addresses);
+            return this;
+        }
+
+        public Builder setDnsServers(final Collection<? extends InetAddress> dnsServers) {
+            this.dnsServers.clear();
+            this.dnsServers.addAll(dnsServers);
+            return this;
+        }
+
+        public Builder setDnsSearchDomains(final Collection<String> dnsSearchDomains) {
+            this.dnsSearchDomains.clear();
+            this.dnsSearchDomains.addAll(dnsSearchDomains);
+            return this;
+        }
+
+        public Builder setExcludedApplications(final Collection<String> excludedApplications) {
+            this.excludedApplications.clear();
+            this.excludedApplications.addAll(excludedApplications);
+            return this;
+        }
+
+        public Builder setIncludedApplications(final Collection<String> includedApplications) {
+            this.includedApplications.clear();
+            this.includedApplications.addAll(includedApplications);
+            return this;
+        }
+
+        public Builder setPreUp(final List<String> preUp) {
+            this.preUp.clear();
+            this.preUp.addAll(preUp);
+            return this;
+        }
+
+        public Builder setPostUp(final List<String> postUp) {
+            this.postUp.clear();
+            this.postUp.addAll(postUp);
+            return this;
+        }
+
+        public Builder setPreDown(final List<String> preDown) {
+            this.preDown.clear();
+            this.preDown.addAll(preDown);
+            return this;
+        }
+
+        public Builder setPostDown(final List<String> postDown) {
+            this.postDown.clear();
+            this.postDown.addAll(postDown);
+            return this;
+        }
     }
 }

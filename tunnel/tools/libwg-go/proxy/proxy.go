@@ -68,7 +68,7 @@ func awgStartProxy(interfaceName string, config string, pkgName string, bypass i
 		stdBind.SetControl(protectControlFunc)
 	}
 
-	dev := device.NewDevice(tun, stdBind, shared.NewLogger("Tun/"+interfaceName), conf.Device.DomainBlockingEnabled, conf.Device.BlockedDomains)
+	dev := device.NewDevice(tun, stdBind, shared.NewLogger("Tun/"+interfaceName), conf.Device.DomainBlockingEnabled)
 
 	err = dev.IpcSet(setting.IpcRequest)
 
