@@ -211,6 +211,12 @@ public final class Interface {
                 case "i5":
                     builder.parseSpecialJunkI5(attribute.getValue());
                     break;
+                // for backwards compat
+                case "j1":
+                case "j2":
+                case "j3":
+                case "itime":
+                    continue;
                 default:
                     throw new BadConfigException(Section.INTERFACE, Location.TOP_LEVEL,
                             Reason.UNKNOWN_ATTRIBUTE, attribute.getKey());
