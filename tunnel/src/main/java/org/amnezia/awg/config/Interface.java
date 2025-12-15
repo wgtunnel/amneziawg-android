@@ -5,6 +5,7 @@
 
 package org.amnezia.awg.config;
 
+import androidx.annotation.Nullable;
 import org.amnezia.awg.config.BadConfigException.Location;
 import org.amnezia.awg.config.BadConfigException.Reason;
 import org.amnezia.awg.config.BadConfigException.Section;
@@ -14,19 +15,8 @@ import org.amnezia.awg.crypto.KeyPair;
 import org.amnezia.awg.util.NonNullForAll;
 
 import java.net.InetAddress;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
-
-import androidx.annotation.Nullable;
 
 /**
  * Represents the configuration for an AmneziaWG interface (an [Interface] block). Interfaces must
@@ -986,52 +976,20 @@ public final class Interface {
             }
         }
 
-        public Builder parseInitPacketMagicHeader(final String initPacketMagicHeader) throws BadConfigException {
-            try {
-                long h2 = Long.parseLong(initPacketMagicHeader);
-                if (h2 <= 0 || h2 > 4294967295L) {
-                    throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, initPacketMagicHeader);
-                }
-                return setInitPacketMagicHeader(initPacketMagicHeader);
-            } catch (final NumberFormatException e) {
-                throw new BadConfigException(Section.INTERFACE, Location.INIT_PACKET_MAGIC_HEADER, initPacketMagicHeader, e);
-            }
+        public Builder parseInitPacketMagicHeader(final String initPacketMagicHeader) {
+            return setInitPacketMagicHeader(initPacketMagicHeader);
         }
 
-        public Builder parseResponsePacketMagicHeader(final String responsePacketMagicHeader) throws BadConfigException {
-            try {
-                long h2 = Long.parseLong(responsePacketMagicHeader);
-                if (h2 <= 0 || h2 > 4294967295L) {
-                    throw new BadConfigException(Section.INTERFACE, Location.RESPONSE_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, responsePacketMagicHeader);
-                }
-                return setResponsePacketMagicHeader(responsePacketMagicHeader);
-            } catch (final NumberFormatException e) {
-                throw new BadConfigException(Section.INTERFACE, Location.RESPONSE_PACKET_MAGIC_HEADER, responsePacketMagicHeader, e);
-            }
+        public Builder parseResponsePacketMagicHeader(final String responsePacketMagicHeader) {
+            return setResponsePacketMagicHeader(responsePacketMagicHeader);
         }
 
-        public Builder parseUnderloadPacketMagicHeader(final String underloadPacketMagicHeader) throws BadConfigException {
-            try {
-                long h3 = Long.parseLong(underloadPacketMagicHeader);
-                if (h3 <= 0 || h3 > 4294967295L) {
-                    throw new BadConfigException(Section.INTERFACE, Location.UNDERLOAD_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, underloadPacketMagicHeader);
-                }
-                return setUnderloadPacketMagicHeader(underloadPacketMagicHeader);
-            } catch (final NumberFormatException e) {
-                throw new BadConfigException(Section.INTERFACE, Location.UNDERLOAD_PACKET_MAGIC_HEADER, underloadPacketMagicHeader, e);
-            }
+        public Builder parseUnderloadPacketMagicHeader(final String underloadPacketMagicHeader) {
+            return setUnderloadPacketMagicHeader(underloadPacketMagicHeader);
         }
 
-        public Builder parseTransportPacketMagicHeader(final String transportPacketMagicHeader) throws BadConfigException {
-            try {
-                long h4 = Long.parseLong(transportPacketMagicHeader);
-                if (h4 <= 0 || h4 > 4294967295L) {
-                    throw new BadConfigException(Section.INTERFACE, Location.TRANSPORT_PACKET_MAGIC_HEADER, Reason.INVALID_VALUE, transportPacketMagicHeader);
-                }
-                return setTransportPacketMagicHeader(transportPacketMagicHeader);
-            } catch (final NumberFormatException e) {
-                throw new BadConfigException(Section.INTERFACE, Location.TRANSPORT_PACKET_MAGIC_HEADER, transportPacketMagicHeader, e);
-            }
+        public Builder parseTransportPacketMagicHeader(final String transportPacketMagicHeader) {
+            return setTransportPacketMagicHeader(transportPacketMagicHeader);
         }
 
         public Builder parseSpecialJunkI1(final String specialJunkI1) {
