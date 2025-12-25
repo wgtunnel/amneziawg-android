@@ -18,7 +18,7 @@ repositories {
 build.gradle.kts
 ```
 dependencies {
-    implementation("com.zaneschepke:amneziawg-android:2.3.2")
+    implementation("com.zaneschepke:amneziawg-android:2.3.3")
 }
 ```
 

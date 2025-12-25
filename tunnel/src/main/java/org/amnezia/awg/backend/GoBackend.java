@@ -89,9 +89,9 @@ public final class GoBackend extends AbstractBackend {
                 throw new BackendException(BackendException.Reason.TUN_CREATION_ERROR);
             Log.d(TAG, "Go backend " + awgVersion());
             tunnelActionHandler.runPreUp(config.getInterface().getPreUp());
-            String packageName = context.getPackageName();
-            Log.d(TAG, "App package name " + packageName);
-            currentTunnelHandle = awgTurnOn(tunnel.getName(), tun.detachFd(), goConfig, packageName);
+            String uapiPath = context.getDataDir().getAbsolutePath();
+            Log.d(TAG, "UAPI path " + uapiPath);
+            currentTunnelHandle = awgTurnOn(tunnel.getName(), tun.detachFd(), goConfig, uapiPath);
             tunnelActionHandler.runPostUp(config.getInterface().getPostUp());
         }
         if (currentTunnelHandle < 0)

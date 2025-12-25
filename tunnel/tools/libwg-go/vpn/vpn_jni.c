@@ -8,7 +8,7 @@
 #include <string.h>
 
 struct go_string { const char *str; long n; };
-extern int awgTurnOn(struct go_string ifname, int tun_fd, struct go_string settings, struct go_string pkgname);
+extern int awgTurnOn(struct go_string ifname, int tun_fd, struct go_string settings, struct go_string uapipath);
 extern void awgTurnOff(int handle);
 extern int awgGetSocketV4(int handle);
 extern int awgGetSocketV6(int handle);
@@ -16,14 +16,14 @@ extern char *awgGetConfig(int handle);
 extern char *awgVersion();
 extern int awgUpdateTunnelPeers(int handle, struct go_string settings);
 
-JNIEXPORT jint JNICALL Java_org_amnezia_awg_GoBackend_awgTurnOn(JNIEnv *env, jclass c, jstring ifname, jint tun_fd, jstring settings, jstring pkgname)
+JNIEXPORT jint JNICALL Java_org_amnezia_awg_GoBackend_awgTurnOn(JNIEnv *env, jclass c, jstring ifname, jint tun_fd, jstring settings, jstring uapipath)
 {
 	const char *ifname_str = (*env)->GetStringUTFChars(env, ifname, 0);
 	size_t ifname_len = (*env)->GetStringUTFLength(env, ifname);
 	const char *settings_str = (*env)->GetStringUTFChars(env, settings, 0);
 	size_t settings_len = (*env)->GetStringUTFLength(env, settings);
-	const char *pkgname_str = (*env)->GetStringUTFChars(env, pkgname, 0);
-    	size_t pkgname_len = (*env)->GetStringUTFLength(env, pkgname);
+	const char *uapipath_str = (*env)->GetStringUTFChars(env, uapipath, 0);
+    	size_t uapipath_len = (*env)->GetStringUTFLength(env, uapipath);
 	int ret = awgTurnOn((struct go_string){
 		.str = ifname_str,
 		.n = ifname_len
@@ -31,12 +31,12 @@ JNIEXPORT jint JNICALL Java_org_amnezia_awg_GoBackend_awgTurnOn(JNIEnv *env, jcl
 		.str = settings_str,
 		.n = settings_len
 	}, (struct go_string){
-       		.str = pkgname_str,
-       		.n = pkgname_len
+       		.str = uapipath_str,
+       		.n = uapipath_len
        	});
 	(*env)->ReleaseStringUTFChars(env, ifname, ifname_str);
 	(*env)->ReleaseStringUTFChars(env, settings, settings_str);
-	(*env)->ReleaseStringUTFChars(env, pkgname, pkgname_str);
+	(*env)->ReleaseStringUTFChars(env, uapipath, uapipath_str);
 	return ret;
 }
 

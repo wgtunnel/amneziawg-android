@@ -9,7 +9,7 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 struct go_string { const char *str; long n; };
-extern int awgStartProxy(struct go_string ifname, struct go_string settings, struct go_string pkgname, int bypass);
+extern int awgStartProxy(struct go_string ifname, struct go_string settings, struct go_string uapipath, int bypass);
 extern void awgStopProxy();
 extern char *awgGetProxyConfig(int handle);
 extern int awgUpdateProxyTunnelPeers(int handle, struct go_string settings);
@@ -36,14 +36,14 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     LOGD("JNI_OnUnload: Cleared globals");
 }
 
-JNIEXPORT jint JNICALL Java_org_amnezia_awg_ProxyGoBackend_awgStartProxy(JNIEnv *env, jclass c, jstring ifname, jstring settings, jstring pkgname, jint bypass)
+JNIEXPORT jint JNICALL Java_org_amnezia_awg_ProxyGoBackend_awgStartProxy(JNIEnv *env, jclass c, jstring ifname, jstring settings, jstring uapipath, jint bypass)
 {
     const char *ifname_str = (*env)->GetStringUTFChars(env, ifname, 0);
     size_t ifname_len = (*env)->GetStringUTFLength(env, ifname);
     const char *settings_str = (*env)->GetStringUTFChars(env, settings, 0);
     size_t settings_len = (*env)->GetStringUTFLength(env, settings);
-    const char *pkgname_str = (*env)->GetStringUTFChars(env, pkgname, 0);
-        size_t pkgname_len = (*env)->GetStringUTFLength(env, pkgname);
+    const char *uapipath_str = (*env)->GetStringUTFChars(env, uapipath, 0);
+        size_t uapipath_len = (*env)->GetStringUTFLength(env, uapipath);
     int ret = awgStartProxy((struct go_string){
         .str = ifname_str,
         .n = ifname_len
@@ -51,12 +51,12 @@ JNIEXPORT jint JNICALL Java_org_amnezia_awg_ProxyGoBackend_awgStartProxy(JNIEnv 
         .str = settings_str,
         .n = settings_len
     }, (struct go_string){
-            .str = pkgname_str,
-            .n = pkgname_len
+            .str = uapipath_str,
+            .n = uapipath_len
         },bypass);
     (*env)->ReleaseStringUTFChars(env, ifname, ifname_str);
     (*env)->ReleaseStringUTFChars(env, settings, settings_str);
-    (*env)->ReleaseStringUTFChars(env, pkgname, pkgname_str);
+    (*env)->ReleaseStringUTFChars(env, uapipath, uapipath_str);
     return ret;
 }
 

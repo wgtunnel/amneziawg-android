@@ -78,10 +78,10 @@ public final class ProxyGoBackend extends AbstractBackend {
 
         final String quickConfig = startConfig.toAwgQuickStringResolved(false, true, tunnel.isIpv4ResolutionPreferred(), context);
         tunnelActionHandler.runPreUp(config.getInterface().getPreUp());
-        String packageName = context.getPackageName();
+        String uapiPath = context.getDataDir().getAbsolutePath();
         // simple flag to tell proxy backend to bypass netstack sockets or not
         int bypass = isKillSwitch ? 1 : 0;
-        currentTunnelHandle = awgStartProxy(tunnel.getName(), quickConfig, packageName, bypass);
+        currentTunnelHandle = awgStartProxy(tunnel.getName(), quickConfig, uapiPath, bypass);
         tunnelActionHandler.runPostUp(config.getInterface().getPostUp());
         if (currentTunnelHandle < 0) {
             throw new BackendException(BackendException.Reason.GO_ACTIVATION_ERROR_CODE, currentTunnelHandle);

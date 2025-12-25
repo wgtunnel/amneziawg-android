@@ -37,7 +37,7 @@ func init() {
 }
 
 //export awgTurnOn
-func awgTurnOn(interfaceName string, tunFd int32, settings string, pkgName string) int32 {
+func awgTurnOn(interfaceName string, tunFd int32, settings string, uapiPath string) int32 {
 	tunnel, name, err := tun.CreateUnmonitoredTUNFromFD(int(tunFd))
 
 	if err != nil {
@@ -77,12 +77,12 @@ func awgTurnOn(interfaceName string, tunFd int32, settings string, pkgName strin
 
 	var uapi net.Listener
 
-	uapiFile, err := ipc.UAPIOpen(pkgName, name)
+	uapiFile, err := ipc.UAPIOpen(uapiPath, name)
 
 	if err != nil {
 		shared.LogError(tag, "UAPIOpen: %v", err)
 	} else {
-		uapi, err = ipc.UAPIListen(pkgName, name, uapiFile) // pkgName as rootdir, name as interface
+		uapi, err = ipc.UAPIListen(uapiPath, name, uapiFile) // uapiPath as rootdir, name as interface
 		if err != nil {
 			uapiFile.Close()
 			shared.LogError(tag, "UAPIListen: %v", err)

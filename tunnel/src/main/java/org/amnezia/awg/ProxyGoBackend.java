@@ -4,7 +4,7 @@ import androidx.annotation.Nullable;
 import org.amnezia.awg.backend.SocketProtector;
 
 public class ProxyGoBackend {
-    public static native int awgStartProxy(String ifName, String config, String pkgName, int bypass);
+    public static native int awgStartProxy(String ifName, String config, String uapiPath, int bypass);
 
     public static native int awgUpdateProxyTunnelPeers(int handle, String settings);
 

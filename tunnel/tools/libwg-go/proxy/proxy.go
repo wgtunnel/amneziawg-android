@@ -33,7 +33,7 @@ func init() {
 }
 
 //export awgStartProxy
-func awgStartProxy(interfaceName string, config string, pkgName string, bypass int32) int32 {
+func awgStartProxy(interfaceName string, config string, uapiPath string, bypass int32) int32 {
 
 	conf, err := wireproxyawg.ParseConfigString(config)
 	if err != nil {
@@ -79,14 +79,14 @@ func awgStartProxy(interfaceName string, config string, pkgName string, bypass i
 
 	dev.DisableSomeRoamingForBrokenMobileSemantics()
 
-	uapiFile, err := ipc.UAPIOpen(pkgName, name)
+	uapiFile, err := ipc.UAPIOpen(uapiPath, name)
 
 	var uapi net.Listener
 
 	if err != nil {
 		shared.LogError(tag, "UAPIOpen: %v", err)
 	} else {
-		uapi, err = ipc.UAPIListen(pkgName, name, uapiFile)
+		uapi, err = ipc.UAPIListen(uapiPath, name, uapiFile)
 		if err != nil {
 			uapiFile.Close()
 			shared.LogError(tag, "UAPIListen: %v", err)

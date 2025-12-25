@@ -12,7 +12,7 @@ public class GoBackend {
 
     public static native void awgTurnOff(int handle);
 
-    public static native int awgTurnOn(String ifName, int tunFd, String settings, String pkgName);
+    public static native int awgTurnOn(String ifName, int tunFd, String settings, String uapiPath);
 
     public static native int awgUpdateTunnelPeers(int handle, String settings);
 
