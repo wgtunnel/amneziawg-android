@@ -61,13 +61,6 @@ jobs:
         id: vars
         run: echo "version=${GITHUB_REF##*/}" >> "$GITHUB_OUTPUT"
 
-      - name: Update version in README.md
-        run: |
-          VERSION=${{ steps.vars.outputs.version }}
-          VERSION=${VERSION#v}
-          sed -i '' "s/implementation(\"com.zaneschepke:amneziawg-android:[^\"]*\")/implementation(\"com.zaneschepke:amneziawg-android:$VERSION\")/" README.md
-        shell: bash
-
       # Create GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
