@@ -20,7 +20,7 @@ export GOARCH := $(NDK_GO_ARCH_MAP_$(ANDROID_ARCH_NAME))
 export GOOS := android
 export CGO_ENABLED := 1
 
-GO_VERSION := 1.25.1
+GO_VERSION := 1.25.5
 GO_DIR := $(BUILDDIR)/go-$(GO_VERSION)
 
 export GOROOT := $(GO_DIR)
@@ -28,27 +28,30 @@ export PATH := $(GO_DIR)/bin:$(PATH)
 
 GO_PLATFORM := $(shell uname -s | tr '[:upper:]' '[:lower:]')-$(NDK_GO_ARCH_MAP_$(shell uname -m))
 GO_TARBALL := go$(GO_VERSION).$(GO_PLATFORM).tar.gz
-GO_HASH_darwin-amd64 := 1d622468f767a1b9fe1e1e67bd6ce6744d04e0c68712adc689748bbeccb126bb
-GO_HASH_darwin-arm64 := 68deebb214f39d542e518ebb0598a406ab1b5a22bba8ec9ade9f55fb4dd94a6c
-GO_HASH_linux-amd64 := 7716a0d940a0f6ae8e1f3b3f4f36299dc53e31b16840dbd171254312c41ca12e
+GO_HASH_darwin-amd64 := b69d51bce599e5381a94ce15263ae644ec84667a5ce23d58dc2e63e2c12a9f56
+GO_HASH_darwin-arm64 := bed8ebe824e3d3b27e8471d1307f803fc6ab8e1d0eb7a4ae196979bd9b801dd3
+GO_HASH_linux-amd64 := 9e9b755d63b36acf30c12a9a3fc379243714c1c6d3dd72861da637f336ebb35b
 
 default: $(DESTDIR)/libam-go.so
 
 $(GRADLE_USER_HOME)/caches/golang/$(GO_TARBALL):
 	mkdir -p "$(dir $@)"
 	flock "$@.lock" -c ' \
-    [ -f "$@" ] && exit 0; \
-    curl -o "$@.tmp" "https://dl.google.com/go/$(GO_TARBALL)" && \
-    echo "$(GO_HASH_$(GO_PLATFORM))  $@.tmp" | sha256sum -c && \
-    mv "$@.tmp" "$@"'
+	[ -f "$@" ] && exit 0; \
+	curl -o "$@.tmp" "https://dl.google.com/go/$(GO_TARBALL)" && \
+	echo "$(GO_HASH_$(GO_PLATFORM))  $@.tmp" | sha256sum -c && \
+	mv "$@.tmp" "$@"'
 
 $(BUILDDIR)/go-$(GO_VERSION)/.prepared: $(GRADLE_USER_HOME)/caches/golang/$(GO_TARBALL)
 	mkdir -p "$(dir $@)"
 	flock "$@.lock" -c ' \
-    [ -f "$@" ] && exit 0; \
-    tar -C "$(dir $@)" --strip-components=1 -xzf "$^" && \
-    patch -p1 -f -N -r- -d "$(dir $@)" < goruntime-boottime-over-monotonic.diff && \
-    touch "$@"'
+	[ -f "$@" ] && exit 0; \
+	tar -C "$(dir $@)" --strip-components=1 -xzf "$^" && \
+	cd "$(dir $@)/src/runtime" && sed -i '"'"'s/CLOCK_MONOTONIC/BOOTTIME/g'"'"' sys_linux_*.s && \
+	cd "$(dir $@)/src/runtime" && sed -i '"'"'s/ $1/ $7/g'"'"' sys_linux_*.s && \
+	cd "$(dir $@)/src/runtime" && sed -i '"'"'/libc_mach_absolute_time/a \//go:cgo_import_dynamic libc_mach_continuous_time mach_continuous_time "/usr/lib/libSystem.B.dylib"'"'"' sys_darwin.go && \
+	cd "$(dir $@)/src/runtime" && sed -i '"'"'s/mach_absolute_time/mach_continuous_time/g'"'"' sys_darwin_amd64.s sys_darwin_arm64.s && \
+	touch "$@"'
 
 $(DESTDIR)/libam-go.so: export PATH := $(BUILDDIR)/go-$(GO_VERSION)/bin/:$(PATH)
 $(DESTDIR)/libam-go.so: $(BUILDDIR)/go-$(GO_VERSION)/.prepared go.mod
