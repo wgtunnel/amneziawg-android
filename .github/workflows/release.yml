@@ -12,7 +12,7 @@ on:
 jobs:
   publish:
     name: release-package
-    runs-on: macos-14
+    runs-on: ubuntu-latest
 
     env:
       KEY_ID: ${{ secrets.KEY_ID }}
@@ -25,15 +25,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Install coreutils for sha256sum
-        run: brew install coreutils
-
-      - name: Add coreutils to PATH (for sha256sum without 'g' prefix)
-        run: echo "/opt/homebrew/opt/coreutils/libexec/gnubin" >> $GITHUB_PATH
-
-      - name: Install Flock
-        run: brew install flock
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -55,7 +46,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '^1.25.0'
+          go-version: '^1.25.5'
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
