@@ -28,6 +28,8 @@ replace github.com/amnezia-vpn/amneziawg-go => github.com/wgtunnel/amneziawg-go 
 
 replace github.com/artem-russkikh/wireproxy-awg => github.com/wgtunnel/wireproxy-awg v0.0.0-20260124084953-411c5dc2a484
 
+replace github.com/things-go/go-socks5 => github.com/wgtunnel/go-socks5 v0.0.0-20260307052555-86f8d93b9534
+
 // local dev
 //replace github.com/amnezia-vpn/amneziawg-go => ../../../../amneziawg-go
 //
