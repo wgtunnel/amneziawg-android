@@ -14,12 +14,12 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-github.com/wgtunnel/amneziawg-go v0.0.0-20251225080458-6a08ea62878d h1:BZLOsaur7sLBSkrc4s0vCJaKhi/DtQmpWEhRItoW3jI=
-github.com/wgtunnel/amneziawg-go v0.0.0-20251225080458-6a08ea62878d/go.mod h1:dXqnIemvu1lQHb9sp8i4452qL/2z2s0AuOibemqrsUc=
+github.com/wgtunnel/amneziawg-go v0.0.0-20260309041639-0569d899c9bf h1:uBuzF4PYzGsH2qswDPHPwCvobmTamPUgBtvtXMjNvPc=
+github.com/wgtunnel/amneziawg-go v0.0.0-20260309041639-0569d899c9bf/go.mod h1:34ORGpgqg0Zthlumd0Vd3WCOjMlesLc+n5lhk7CHk+U=
 github.com/wgtunnel/go-socks5 v0.0.0-20260307052555-86f8d93b9534 h1:hpF1TN8okGWv9j4lwPcWVMNDeu+1o52HB6NcEYw0WPs=
 github.com/wgtunnel/go-socks5 v0.0.0-20260307052555-86f8d93b9534/go.mod h1:1YBHVYG7Oli5ae+Pwkp630cPAwY1pjUPmohO1n0Emg0=
-github.com/wgtunnel/wireproxy-awg v0.0.0-20260124084953-411c5dc2a484 h1:I+BhJJ7kT3phJfn/37eOKOOIlb7RwKpXtMp+1lXLwMw=
-github.com/wgtunnel/wireproxy-awg v0.0.0-20260124084953-411c5dc2a484/go.mod h1:YtnutLQwL21gDUMEa7e2Yp6sdK80aQukrG0ujhxH4QY=
+github.com/wgtunnel/wireproxy-awg v0.0.0-20260309043206-ff4200f20ff2 h1:5U3FgY+o072foLwxWDg5T2XGHc/z1ixm6vEH4a1vC7k=
+github.com/wgtunnel/wireproxy-awg v0.0.0-20260309043206-ff4200f20ff2/go.mod h1:42SFUX4WBnKNdHsMt2MZ1d4xGg2PwKzkjKZKAPSFlD4=
 go.uber.org/atomic v1.11.0 h1:ZvwS0R+56ePWxUNi+Atn9dWONBPp/AUETXlHW0DxSjE=
 go.uber.org/atomic v1.11.0/go.mod h1:LUxbIzbOniOlMKjJjyPfpl4v+PKK2cNJn91OQbhoJI0=
 golang.org/x/crypto v0.45.0 h1:jMBrvKuj23MTlT0bQEOBcAE0mjg8mK9RXFhRH6nyF3Q=

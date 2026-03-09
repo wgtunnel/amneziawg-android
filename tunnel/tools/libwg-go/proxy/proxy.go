@@ -68,7 +68,11 @@ func awgStartProxy(interfaceName string, config string, uapiPath string, bypass 
 		stdBind.SetControl(protectControlFunc)
 	}
 
-	dev := device.NewDevice(tun, stdBind, shared.NewLogger("Tun/"+interfaceName), conf.Device.DomainBlockingEnabled)
+	statusCB := func(code device.StatusCode) {
+		// TODO add handshake callbacks for status codes
+	}
+
+	dev := device.NewDevice(tun, stdBind, shared.NewLogger("Tun/"+interfaceName), conf.Device.DomainBlockingEnabled, statusCB)
 
 	err = dev.IpcSet(setting.IpcRequest)
 

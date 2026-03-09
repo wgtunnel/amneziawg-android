@@ -1,6 +1,6 @@
 module github.com/amnezia-vpn/amneziawg-android
 
-go 1.25.5
+go 1.24.4
 
 require (
 	github.com/amnezia-vpn/amneziawg-go v0.2.16
@@ -24,9 +24,9 @@ require (
 	gvisor.dev/gvisor v0.0.0-20231202080848-1f7806d17489 // indirect
 )
 
-replace github.com/amnezia-vpn/amneziawg-go => github.com/wgtunnel/amneziawg-go v0.0.0-20251225080458-6a08ea62878d
+replace github.com/amnezia-vpn/amneziawg-go => github.com/wgtunnel/amneziawg-go v0.0.0-20260309041639-0569d899c9bf
 
-replace github.com/artem-russkikh/wireproxy-awg => github.com/wgtunnel/wireproxy-awg v0.0.0-20260124084953-411c5dc2a484
+replace github.com/artem-russkikh/wireproxy-awg => github.com/wgtunnel/wireproxy-awg v0.0.0-20260309043206-ff4200f20ff2
 
 replace github.com/things-go/go-socks5 => github.com/wgtunnel/go-socks5 v0.0.0-20260307052555-86f8d93b9534
 
