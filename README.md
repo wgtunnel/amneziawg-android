@@ -1,5 +1,10 @@
 # Android GUI for [AmneziaWG](https://amnezia.org/learn-more/31_amneziawg)
 
+> ⚠️ **Archived**
+>
+> Core logic has been integrated into [WG Tunnel Android](https://github.com/wgtunnel/android).  
+> This repository is no longer maintained.
+
 **[Download from the Play Store](https://play.google.com/store/apps/details?id=org.amnezia.awg)**
 
 This is an Android GUI for [AmneziaWG](https://amnezia.org/learn-more/31_amneziawg).
